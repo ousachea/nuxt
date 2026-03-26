@@ -145,5 +145,5 @@ export { getRouteRules } from 'nitropack/runtime/internal/route-rules';
 export { useEvent } from 'nitropack/runtime/internal/context';
 export { defineTask, runTask } from 'nitropack/runtime/internal/task';
 export { defineNitroErrorHandler } from 'nitropack/runtime/internal/error/utils';
-export { buildAssetsURL as __buildAssetsURL, publicAssetsURL as __publicAssetsURL } from '/home/projects/nuxt-starter-cp8gtpxd/node_modules/.pnpm/@nuxt+nitro-server@3.21.2_nuxt@3.21.2_typescript@5.9.3/node_modules/@nuxt/nitro-server/dist/runtime/utils/paths';
-export { defineAppConfig } from '/home/projects/nuxt-starter-cp8gtpxd/node_modules/.pnpm/@nuxt+nitro-server@3.21.2_nuxt@3.21.2_typescript@5.9.3/node_modules/@nuxt/nitro-server/dist/runtime/utils/config';
+export { buildAssetsURL as __buildAssetsURL, publicAssetsURL as __publicAssetsURL } from '/home/ousachea/nuxt/node_modules/.pnpm/@nuxt+nitro-server@3.21.2_nuxt@3.21.2_typescript@5.9.3/node_modules/@nuxt/nitro-server/dist/runtime/utils/paths';
+export { defineAppConfig } from '/home/ousachea/nuxt/node_modules/.pnpm/@nuxt+nitro-server@3.21.2_nuxt@3.21.2_typescript@5.9.3/node_modules/@nuxt/nitro-server/dist/runtime/utils/config';
