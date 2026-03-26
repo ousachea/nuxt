@@ -463,7 +463,7 @@ const EXTERNAL_LINKS = [
   { key: 'njav', label: 'NJAV' },
   { key: 'missav', label: 'MissAV' },
   { key: '24av', label: '24AV' },
-  { key: '24av-uncensor', label: '24AV UC' }
+  { key: 'javtrailers', label: 'JavTrailers' }
 ]
 const PULL_THRESHOLD = 70
 
@@ -895,7 +895,9 @@ function preloadAllGallery() {
 function copyToClipboard(code) { navigator.clipboard.writeText(code).then(() => showToast('Copied: ' + code)).catch(() => showToast('Copy failed', 'error')) }
 function openExternalLink(code, type) {
   const c = code.toLowerCase()
-  const urls = { missav: `https://missav.ws/en/${c}`, '24av': `https://24av.net/en/v/${c}`, '24av-uncensor': `https://24av.net/en/uncensored/${c}`, njav: `https://www.njav.com/en/xvideos/${c}` }
+  const p = parseCode(code)
+  const javId = p ? p.prefix + ('00000' + p.rawNumber).slice(-5) : c.replace('-', '')
+  const urls = { missav: `https://missav.ws/en/${c}`, '24av': `https://24av.net/en/v/${c}`, javtrailers: `https://javtrailers.com/video/${javId}`, njav: `https://www.njav.com/en/xvideos/${c}` }
   window.open(urls[type] || urls.njav, '_blank', 'noopener,noreferrer')
 }
 function clearViewHistory() {
