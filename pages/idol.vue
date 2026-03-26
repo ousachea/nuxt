@@ -1,12 +1,17 @@
 <template>
-    <div class="app" @touchstart="onAppTouchStart" @touchend="onAppTouchEnd">
-      <!-- Top Bar -->
+    <!-- Loading screen — prevents FOUC while localStorage loads -->
+    <Transition name="app-load">
+      <div v-if="!appReady" class="app-loading">
+        <div class="loading-logo">W</div>
+        <div class="loading-bar"><div class="loading-fill"></div></div>
+      </div>
+    </Transition>
+  
+    <div v-if="appReady" class="app" :class="{ dark: darkMode }" @touchstart="onAppTouchStart" @touchend="onAppTouchEnd">
       <header class="bar">
         <div class="bar-left">
           <button v-if="currentView !== 'artists'" @click="goBack" class="btn-back">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
           </button>
           <div v-if="currentView === 'artists'" class="stats">
             <span class="stat"><b>{{ artists.length }}</b> artists</span>
@@ -33,30 +38,38 @@
               <span v-else>{{ currentArtist.name.charAt(0) }}</span>
             </div>
             <span class="bar-title bar-title-dim">{{ currentArtist.name }}</span>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: var(--ink3); flex-shrink:0">
-              <path d="M9 18l6-6-6-6" />
-            </svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--ink3);flex-shrink:0"><path d="M9 18l6-6-6-6"/></svg>
             <span v-if="currentWork" class="bar-title mono">{{ currentWork.code }}</span>
           </div>
         </div>
         <div class="bar-right">
           <div class="search-box">
-            <svg class="search-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.35-4.35" />
-            </svg>
-            <input ref="searchInputRef" v-model="searchQuery" type="text"
-              :placeholder="currentView === 'works' ? 'Filter works...' : 'Search...'" />
+            <svg class="search-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input ref="searchInputRef" v-model="searchQuery" type="text" :placeholder="currentView === 'works' ? 'Filter works...' : 'Search...'" />
             <button v-if="searchQuery" @click="searchQuery = ''" class="search-x">&times;</button>
           </div>
-          <button v-if="currentView === 'works' || currentView === 'artists'"
+          <!-- Desktop: view filter + compact toggle -->
+          <button v-if="(currentView === 'works' || currentView === 'artists') && !isMobile"
             @click="cycleViewFilter" class="btn-filter" :class="{ active: viewFilter !== 'all' }">
             {{ viewFilter === 'all' ? 'All' : viewFilter === 'unviewed' ? 'New' : 'Seen' }}
           </button>
+          <button v-if="currentView === 'works' && !isMobile" @click="compactWorks = !compactWorks"
+            class="btn-icon" :class="{ active: compactWorks }" title="Compact view">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          </button>
+          <!-- Dark mode toggle (always visible) -->
+          <button @click="toggleDarkMode" class="btn-icon" title="Toggle dark mode">
+            <svg v-if="!darkMode" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+          </button>
+          <!-- Mobile: filter/sort sheet trigger -->
+          <button v-if="(currentView === 'works' || currentView === 'artists') && isMobile"
+            @click="showBottomSheet = true" class="btn-icon" :class="{ active: viewFilter !== 'all' || workSortBy !== 'default' }">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/></svg>
+          </button>
           <div class="menu-wrap">
             <button @click="showMenu = !showMenu" class="btn-menu">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                <circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" />
-              </svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
             </button>
             <Transition name="drop">
               <div v-if="showMenu" class="menu-drop" @click="showMenu = false">
@@ -77,12 +90,23 @@
       <Transition :name="viewTransition" mode="out-in">
   
         <!-- ARTISTS VIEW -->
-        <main v-if="currentView === 'artists'" key="artists" class="page">
+        <main v-if="currentView === 'artists'" key="artists" class="page"
+          @touchstart="onPullStart" @touchmove="onPullMove" @touchend="onPullEnd">
+  
+          <!-- Pull-to-refresh indicator -->
+          <div class="ptr-indicator" :style="{ height: pullDistance + 'px', opacity: pullOpacity }">
+            <svg :style="{ transform: `rotate(${pullRotation}deg)` }"
+              width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+          </div>
+  
           <div v-if="alphabeticalGroups.length > 3" class="alpha-rail">
             <button v-for="letter in allLetters" :key="letter" @click="scrollToLetter(letter)"
               :class="{ active: alphabeticalGroups.includes(letter) }"
               :disabled="!alphabeticalGroups.includes(letter)">{{ letter }}</button>
           </div>
+  
           <div v-for="letter in alphabeticalGroups" :key="letter" :ref="el => { if (el) groupRefs[letter] = el }" class="group">
             <div class="group-head">
               <span class="letter">{{ letter }}</span>
@@ -91,7 +115,8 @@
             <div class="grid-artists">
               <div v-for="artist in groupedArtists[letter]" :key="artist.name" class="a-card"
                 :class="{ dim: viewedArtists.includes(artist.name) && viewFilter === 'all' }"
-                @click="selectArtist(artist.name)">
+                @click="selectArtist(artist.name)"
+                @mouseenter="preloadArtistImage(artist)">
                 <div class="a-img">
                   <div class="skeleton"></div>
                   <img v-if="getProgressiveImage(artist).full" :src="getProgressiveImage(artist).full"
@@ -99,24 +124,22 @@
                   <div v-else class="a-ph">{{ artist.name.charAt(0) }}</div>
                   <div class="a-overlay">
                     <span class="a-name">{{ artist.name }}</span>
-                    <span class="a-count">{{ getArtistWorkCount(artist) }}</span>
+                    <!-- viewed/total badge -->
+                    <span class="a-count">{{ getArtistViewedCount(artist) }}/{{ getArtistWorkCount(artist) }}</span>
                   </div>
                   <div v-if="getArtistWorkCount(artist) > 0" class="progress-bar">
                     <div class="progress-fill" :style="{ width: getArtistProgress(artist) + '%' }"></div>
                   </div>
-                  <span v-if="viewedArtists.includes(artist.name)" class="badge-check">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
+                  <span v-if="getArtistProgress(artist) === 100" class="badge-check">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
                   </span>
                 </div>
               </div>
             </div>
           </div>
+  
           <div v-if="filteredArtists.length === 0" class="empty">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3">
-              <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /><path d="M8 11h6" />
-            </svg>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M8 11h6"/></svg>
             <p>No artists found</p>
           </div>
         </main>
@@ -129,10 +152,15 @@
                 <span v-if="currentArtist?.mainWorks?.length" class="chip">{{ currentArtist.mainWorks.length }} main</span>
                 <span v-if="currentArtist?.compilations?.length" class="chip">{{ currentArtist.compilations.length }} comp</span>
                 <span class="chip chip-progress">{{ getArtistProgress(currentArtist) }}% viewed</span>
+                <!-- Artist URL chip -->
+                <a v-if="currentArtist?.url" :href="currentArtist.url" target="_blank" rel="noopener noreferrer" class="chip chip-url">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  Profile
+                </a>
               </div>
             </div>
             <div class="works-actions">
-              <select v-model="workSortBy" class="sort-select">
+              <select v-if="!isMobile" v-model="workSortBy" class="sort-select">
                 <option value="default">Default</option>
                 <option value="codeAsc">Code A-Z</option>
                 <option value="codeDesc">Code Z-A</option>
@@ -148,7 +176,8 @@
                 <span class="w-label">{{ section.label }}</span>
                 <span class="w-n">{{ section.items.length }}</span>
               </div>
-              <div class="grid-works">
+              <!-- compact class enables smaller grid -->
+              <div class="grid-works" :class="{ compact: compactWorks }">
                 <div v-for="work in section.items" :key="work.code" class="w-card"
                   :class="{ dim: viewedWorks.includes(work.code) && viewFilter === 'all' }"
                   @click="openWorkView(work)">
@@ -158,9 +187,7 @@
                       class="fade-img" @load="onImgLoad" @error="onImgError" />
                     <span v-if="isCoverWork(currentArtist.name, work.code)" class="badge-star">*</span>
                     <span v-if="viewedWorks.includes(work.code)" class="badge-check tl">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
                     </span>
                   </div>
                   <span class="w-code">{{ work.code }}</span>
@@ -169,9 +196,7 @@
             </div>
           </div>
           <div v-if="filteredMainWorks.length === 0 && filteredCompilations.length === 0" class="empty">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3">
-              <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 9l6 6M15 9l-6 6" />
-            </svg>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9l6 6M15 9l-6 6"/></svg>
             <p>{{ searchQuery || viewFilter !== 'all' ? 'No matches' : 'No works yet' }}</p>
           </div>
         </main>
@@ -183,30 +208,22 @@
             <div class="detail-left">
               <div class="big-img" @click="openLightbox(currentWork, 0)">
                 <div class="skeleton"></div>
-                <img :src="getProgressiveWorkImage(currentWork).full" :alt="currentWork.code"
-                  class="fade-img" @load="onImgLoad" @error="onImgError" />
+                <img :src="getProgressiveWorkImage(currentWork).full" :alt="currentWork.code" class="fade-img" @load="onImgLoad" @error="onImgError" />
               </div>
               <div class="actions">
                 <div class="act-group">
-                  <button @click="setCoverWork(currentArtist.name, currentWork.code)" class="act"
-                    :class="{ on: isCoverWork(currentArtist.name, currentWork.code) }">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                    </svg>
+                  <button @click="setCoverWork(currentArtist.name, currentWork.code)" class="act" :class="{ on: isCoverWork(currentArtist.name, currentWork.code) }">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                     {{ isCoverWork(currentArtist.name, currentWork.code) ? 'Cover' : 'Set cover' }}
                   </button>
                   <button @click="openUploadModal(currentWork.code)" class="act">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
-                    </svg>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                     {{ hasCustomImage(currentWork.code) ? 'Update img' : 'Add image' }}
                   </button>
                 </div>
                 <div class="act-group">
                   <button @click="copyToClipboard(currentWork.code)" class="act act-copy">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                    </svg>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
                     Copy code
                   </button>
                 </div>
@@ -214,38 +231,35 @@
             </div>
             <div class="detail-right">
               <h1 class="d-code">{{ currentWork.code }}</h1>
+              <!-- Artist URL row -->
+              <a v-if="currentArtist?.url" :href="currentArtist.url" target="_blank" rel="noopener noreferrer" class="artist-url-row">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                {{ currentArtist.url }}
+              </a>
               <div class="detail-section">
                 <div class="section-header">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <circle cx="12" cy="12" r="10" /><polygon points="10 8 16 12 10 16 10 8" />
-                  </svg>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
                   Watch on
                 </div>
                 <div class="link-grid">
-                  <button v-for="link in externalLinks" :key="link.key"
-                    @click="openExternalLink(currentWork.code, link.key)" class="link-btn">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                      <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-                      <polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" />
-                    </svg>
+                  <button v-for="link in externalLinks" :key="link.key" @click="openExternalLink(currentWork.code, link.key)" class="link-btn">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     {{ link.label }}
                   </button>
                 </div>
               </div>
               <div v-if="currentWorkList.length > 1" class="nav-row">
                 <button @click="navigateWork(-1)" :disabled="!canNavigateWork(-1)" class="nav-btn">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6" /></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
                 </button>
                 <span class="nav-pos">{{ currentWorkIndex + 1 }} <small>of {{ currentWorkList.length }}</small></span>
                 <button @click="navigateWork(1)" :disabled="!canNavigateWork(1)" class="nav-btn">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6" /></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
                 </button>
               </div>
               <div class="detail-section">
                 <div class="section-header">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
-                  </svg>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                   Gallery
                   <button @click="preloadAllGallery" class="btn-sm" :disabled="isPreloading">{{ isPreloading ? '...' : 'Load all' }}</button>
                 </div>
@@ -258,9 +272,7 @@
                   </div>
                 </div>
                 <div v-if="galleryAllFailed" class="gallery-empty">
-                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3">
-                    <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
-                  </svg>
+                  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:.3"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                   <p>No gallery images available</p>
                 </div>
               </div>
@@ -303,6 +315,10 @@
             <div class="m-head"><h3>Add artist</h3><button @click="showAddArtistModal = false" class="m-x">&times;</button></div>
             <div class="m-body">
               <label class="field"><span>Name</span><input v-model="newArtistName" placeholder="Artist name" @keyup.enter="addNewArtist" /></label>
+              <label class="field">
+                <span>Profile URL <em style="font-style:normal;font-weight:400;text-transform:none;letter-spacing:0">(optional)</em></span>
+                <input v-model="newArtistUrl" placeholder="https://..." />
+              </label>
             </div>
             <div class="m-foot">
               <button @click="showAddArtistModal = false" class="btn-flat">Cancel</button>
@@ -341,12 +357,43 @@
         </div>
       </Transition>
   
+      <!-- Mobile Bottom Sheet (filter + sort) -->
+      <Transition name="sheet">
+        <div v-if="showBottomSheet" class="sheet-backdrop" @click="showBottomSheet = false">
+          <div class="bottom-sheet" @click.stop>
+            <div class="sheet-handle"></div>
+            <div class="sheet-title">Filter & Sort</div>
+            <div class="sheet-section">
+              <div class="sheet-label">Show</div>
+              <div class="sheet-pills">
+                <button v-for="opt in [['all','All'],['unviewed','New'],['viewed','Seen']]" :key="opt[0]"
+                  @click="viewFilter = opt[0]" class="pill" :class="{ active: viewFilter === opt[0] }">{{ opt[1] }}</button>
+              </div>
+            </div>
+            <div v-if="currentView === 'works'" class="sheet-section">
+              <div class="sheet-label">Sort by</div>
+              <div class="sheet-pills">
+                <button v-for="opt in [['default','Default'],['codeAsc','A→Z'],['codeDesc','Z→A'],['newest','Newest'],['unviewed','Unviewed']]" :key="opt[0]"
+                  @click="workSortBy = opt[0]" class="pill" :class="{ active: workSortBy === opt[0] }">{{ opt[1] }}</button>
+              </div>
+            </div>
+            <div class="sheet-section">
+              <div class="sheet-label">Density</div>
+              <div class="sheet-pills">
+                <button @click="compactWorks = false" class="pill" :class="{ active: !compactWorks }">Normal</button>
+                <button @click="compactWorks = true" class="pill" :class="{ active: compactWorks }">Compact</button>
+              </div>
+            </div>
+            <button @click="showBottomSheet = false" class="sheet-done">Done</button>
+          </div>
+        </div>
+      </Transition>
+  
       <!-- Toast -->
       <Transition name="toast">
         <div v-if="toast.show" class="toast" :class="toast.type">{{ toast.message }}</div>
       </Transition>
   
-      <!-- Keyboard shortcut hint -->
       <div class="shortcut-hint" :class="{ visible: showShortcutHint }">
         <kbd>/</kbd> to search
       </div>
@@ -354,9 +401,10 @@
   </template>
   
   <script setup>
-  import { DEFAULT_ARTISTS } from '~/data/artist.js'
+  import { DEFAULT_ARTISTS } from '~/data/artists.js'
   import { normalizeArtists } from '~/utils/artistHelpers.js'
   
+  // ─── Code parser ──────────────────────────────────────────────────────────
   const codeCache = new Map()
   function parseCode(code) {
     if (!code) return null
@@ -370,6 +418,7 @@
     return r
   }
   
+  // ─── IndexedDB ────────────────────────────────────────────────────────────
   class ImageDB {
     constructor() { this.dbName = 'WorksTrackerDB'; this.storeName = 'customImages'; this.db = null }
     init() {
@@ -380,8 +429,7 @@
         req.onsuccess = () => { this.db = req.result; res(true) }
         req.onupgradeneeded = e => {
           const db = e.target.result
-          if (!db.objectStoreNames.contains(this.storeName))
-            db.createObjectStore(this.storeName, { keyPath: 'code' })
+          if (!db.objectStoreNames.contains(this.storeName)) db.createObjectStore(this.storeName, { keyPath: 'code' })
         }
       })
     }
@@ -409,6 +457,7 @@
     }
   }
   
+  // ─── Constants ────────────────────────────────────────────────────────────
   const ALL_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')
   const EXTERNAL_LINKS = [
     { key: 'njav', label: 'NJAV' },
@@ -416,8 +465,12 @@
     { key: '24av', label: '24AV' },
     { key: '24av-uncensor', label: '24AV UC' }
   ]
+  const PULL_THRESHOLD = 70
   
   // ─── State ────────────────────────────────────────────────────────────────
+  const appReady = ref(false)
+  const darkMode = ref(false)
+  const isMobile = ref(false)
   const currentView = ref('artists')
   const viewTransition = ref('slide-right')
   const activeTab = ref('')
@@ -425,6 +478,7 @@
   const artistSortBy = ref('nameAsc')
   const workSortBy = ref('default')
   const viewFilter = ref('all')
+  const compactWorks = ref(false)
   const artists = ref(normalizeArtists(JSON.parse(JSON.stringify(DEFAULT_ARTISTS))))
   const currentWork = ref(null)
   const currentWorkList = ref([])
@@ -435,9 +489,11 @@
   const showAddWorkModal = ref(false)
   const showUploadModal = ref(false)
   const showAddArtistModal = ref(false)
+  const showBottomSheet = ref(false)
   const showMenu = ref(false)
   const newWork = ref({ artist: '', code: '', type: 'mainWorks' })
   const newArtistName = ref('')
+  const newArtistUrl = ref('')
   const uploadingWork = ref(null)
   const customImageUrl = ref('')
   const lightbox = ref({ show: false, images: [], currentIndex: 0, code: '' })
@@ -461,6 +517,10 @@
   const groupRefs = ref({})
   let lightboxTouchStart = null
   let lightboxTouchEnd = null
+  // Pull-to-refresh
+  const pullStartY = ref(0)
+  const pullDistance = ref(0)
+  const isPullRefreshing = ref(false)
   
   // ─── Computed ─────────────────────────────────────────────────────────────
   const totalCount = computed(() =>
@@ -510,26 +570,74 @@
     { key: 'comp', label: 'Compilations', items: filteredCompilations.value }
   ])
   const galleryAllFailed = computed(() => galleryFailed.value.length >= 20)
+  const pullOpacity = computed(() => Math.min(pullDistance.value / PULL_THRESHOLD, 1))
+  const pullRotation = computed(() => isPullRefreshing.value ? 360 : (pullDistance.value / PULL_THRESHOLD) * 180)
   
   // ─── Watchers ─────────────────────────────────────────────────────────────
-  watch(artists, v => {
-    if (import.meta.client) try { localStorage.setItem('artists', JSON.stringify(v)) } catch {}
-  }, { deep: true })
+  watch(artists, v => { if (import.meta.client) try { localStorage.setItem('artists', JSON.stringify(v)) } catch {} }, { deep: true })
   watch(customImages, v => saveCustomImagesToDB(v), { deep: true })
   watch(viewedArtists, v => { if (import.meta.client) localStorage.setItem('viewedArtists', JSON.stringify(v)) }, { deep: true })
   watch(viewedWorks, v => { if (import.meta.client) localStorage.setItem('viewedWorks', JSON.stringify(v)) }, { deep: true })
   watch(artistSortBy, v => { if (import.meta.client) localStorage.setItem('artistSortBy', v) })
+  watch(darkMode, v => {
+    if (import.meta.client) {
+      localStorage.setItem('darkMode', v ? '1' : '0')
+      document.documentElement.classList.toggle('dark', v)
+    }
+  })
+  watch(compactWorks, v => { if (import.meta.client) localStorage.setItem('compactWorks', v ? '1' : '0') })
   watch(currentWork, () => { galleryFailed.value = []; galleryLoadedCount.value = 0 })
   
   // ─── Lifecycle ────────────────────────────────────────────────────────────
   onMounted(() => {
     imageDB.value = new ImageDB()
+    isMobile.value = window.innerWidth <= 768
+    window.addEventListener('resize', () => { isMobile.value = window.innerWidth <= 768 }, { passive: true })
     initializeApp()
     setupKeyboardShortcuts()
   })
   onBeforeUnmount(() => {
     if (window._worksTrackerKeydown) document.removeEventListener('keydown', window._worksTrackerKeydown)
   })
+  
+  // ─── Pull-to-refresh ──────────────────────────────────────────────────────
+  function onPullStart(e) {
+    if (window.scrollY > 0) return
+    pullStartY.value = e.touches[0].clientY
+  }
+  function onPullMove(e) {
+    if (isPullRefreshing.value || window.scrollY > 0) { pullDistance.value = 0; return }
+    const dy = e.touches[0].clientY - pullStartY.value
+    if (dy < 0) { pullDistance.value = 0; return }
+    pullDistance.value = Math.min(dy * 0.5, PULL_THRESHOLD + 20)
+  }
+  function onPullEnd() {
+    if (pullDistance.value >= PULL_THRESHOLD && !isPullRefreshing.value) {
+      isPullRefreshing.value = true
+      pullDistance.value = 40
+      setTimeout(() => {
+        try {
+          const s = localStorage.getItem('artists')
+          if (s) { const p = JSON.parse(s); if (Array.isArray(p) && p.length) artists.value = normalizeArtists(p) }
+          const va = localStorage.getItem('viewedArtists'); if (va) viewedArtists.value = JSON.parse(va)
+          const vw = localStorage.getItem('viewedWorks'); if (vw) viewedWorks.value = JSON.parse(vw)
+        } catch {}
+        pullDistance.value = 0
+        isPullRefreshing.value = false
+        showToast('Refreshed')
+      }, 800)
+    } else {
+      pullDistance.value = 0
+    }
+  }
+  
+  // ─── Image hover preload ──────────────────────────────────────────────────
+  function preloadArtistImage(artist) {
+    const img = getProgressiveImage(artist)
+    if (img.full) { const i = new Image(); i.src = img.full }
+  }
+  
+  function toggleDarkMode() { darkMode.value = !darkMode.value }
   
   // ─── Methods ──────────────────────────────────────────────────────────────
   function applySortAndFilter(list) {
@@ -552,8 +660,7 @@
     imageDB.value.init().then(ok => {
       if (ok) return imageDB.value.getAll().then(imgs => { customImages.value = imgs || {} })
       useLocalStorageFallback.value = true
-      const s = localStorage.getItem('customImages')
-      if (s) customImages.value = JSON.parse(s)
+      const s = localStorage.getItem('customImages'); if (s) customImages.value = JSON.parse(s)
     }).catch(() => {
       useLocalStorageFallback.value = true
       try { const s = localStorage.getItem('customImages'); if (s) customImages.value = JSON.parse(s) } catch {}
@@ -563,9 +670,13 @@
         ['artists', v => { const p = JSON.parse(v); if (Array.isArray(p) && p.length) artists.value = normalizeArtists(p) }],
         ['viewedArtists', v => { viewedArtists.value = JSON.parse(v) }],
         ['viewedWorks', v => { viewedWorks.value = JSON.parse(v) }],
-        ['artistSortBy', v => { artistSortBy.value = v }]
+        ['artistSortBy', v => { artistSortBy.value = v }],
+        ['darkMode', v => { darkMode.value = v === '1'; document.documentElement.classList.toggle('dark', darkMode.value) }],
+        ['compactWorks', v => { compactWorks.value = v === '1' }]
       ]
-      loads.forEach(([key, fn]) => { try { const v = localStorage.getItem(key); if (v) fn(v) } catch {} })
+      loads.forEach(([key, fn]) => { try { const v = localStorage.getItem(key); if (v !== null) fn(v) } catch {} })
+      // Small delay to avoid FOUC
+      setTimeout(() => { appReady.value = true }, 80)
     })
   }
   
@@ -573,11 +684,10 @@
     const handler = e => {
       const tag = document.activeElement?.tagName
       const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
-      if (e.key === '/' && !isInput) {
-        e.preventDefault(); searchInputRef.value?.focus(); searchInputRef.value?.select(); return
-      }
+      if (e.key === '/' && !isInput) { e.preventDefault(); searchInputRef.value?.focus(); searchInputRef.value?.select(); return }
       if (e.key === 'Escape') {
         if (showMenu.value) { showMenu.value = false; return }
+        if (showBottomSheet.value) { showBottomSheet.value = false; return }
         if (lightbox.value.show) { closeLightbox(); return }
         if (showAddWorkModal.value) { closeAddWorkModal(); return }
         if (showAddArtistModal.value) { showAddArtistModal.value = false; return }
@@ -604,7 +714,6 @@
   function cycleViewFilter() {
     viewFilter.value = viewFilter.value === 'all' ? 'unviewed' : viewFilter.value === 'unviewed' ? 'viewed' : 'all'
   }
-  
   function onImgLoad(e) { e.target.classList.add('loaded') }
   function onImgError(e) { e.target.style.display = 'none' }
   function onGalleryImgLoad(e, index) { e.target.classList.add('loaded'); galleryLoadedCount.value++ }
@@ -614,12 +723,7 @@
     if (thumb) { const sk = thumb.querySelector('.skeleton'); if (sk) sk.style.display = 'none' }
     if (!galleryFailed.value.includes(index)) galleryFailed.value.push(index)
   }
-  
-  function goBack() {
-    viewTransition.value = 'slide-left'
-    currentView.value === 'detail' ? backToWorks() : backToArtists()
-  }
-  
+  function goBack() { viewTransition.value = 'slide-left'; currentView.value === 'detail' ? backToWorks() : backToArtists() }
   function getArtistWorkCount(a) { return (a?.mainWorks?.length || 0) + (a?.compilations?.length || 0) }
   function getArtistViewedCount(artist) {
     if (!artist) return 0
@@ -654,9 +758,7 @@
     }
     return artist.mainWorks?.[0] || artist.compilations?.[0] || null
   }
-  
   function scrollToLetter(letter) { const el = groupRefs.value[letter]; if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
-  
   function selectArtist(name) {
     viewTransition.value = 'slide-right'; saveScrollPosition('artists')
     if (!viewedArtists.value.includes(name)) viewedArtists.value.push(name)
@@ -678,7 +780,7 @@
     nextTick(() => window.scrollTo({ top: 0, behavior: 'instant' }))
   }
   function backToWorks() {
-    viewTransition.value = 'slide-left'; currentView.value = 'works'; currentWork.value = null
+    viewTransition.value = 'slide-left'; currentWork.value = null; currentView.value = 'works'
     nextTick(() => restoreScrollPosition('works'))
   }
   function saveScrollPosition(v) { if (import.meta.client) scrollPositions.value[v] = window.scrollY || 0 }
@@ -714,14 +816,15 @@
   function isCoverWork(name, code) { const a = artists.value.find(x => x.name === name); return a && a.cover === code }
   function setCoverWork(name, code) {
     const a = artists.value.find(x => x.name === name)
-    if (a) { a.cover = code; artists.value = [...artists.value] }; showToast('Cover updated')
+    if (a) { a.cover = code; artists.value = [...artists.value] }
+    showToast('Cover updated')
   }
-  function openAddArtistModal() { newArtistName.value = ''; showAddArtistModal.value = true }
+  function openAddArtistModal() { newArtistName.value = ''; newArtistUrl.value = ''; showAddArtistModal.value = true }
   function addNewArtist() {
     const name = newArtistName.value.trim()
     if (!name) return showToast('Name required', 'error')
     if (artists.value.find(a => a.name.toLowerCase() === name.toLowerCase())) return showToast('Artist exists', 'error')
-    artists.value = [...artists.value, { name, mainWorks: [], compilations: [], cover: '' }]
+    artists.value = [...artists.value, { name, url: newArtistUrl.value.trim(), mainWorks: [], compilations: [], cover: '' }]
     showAddArtistModal.value = false; showToast('Added ' + name)
   }
   function openAddWorkModal() { newWork.value = { artist: activeTab.value || '', code: '', type: 'mainWorks' }; showAddWorkModal.value = true }
@@ -829,7 +932,8 @@
     ;['artists', 'viewedArtists', 'viewedWorks', 'artistSortBy', 'customImages'].forEach(k => localStorage.removeItem(k))
     const p = imageDB.value ? imageDB.value.clear() : Promise.resolve()
     p.then(() => {
-      artists.value = normalizeArtists(JSON.parse(JSON.stringify(DEFAULT_ARTISTS))); currentView.value = 'artists'; activeTab.value = ''; customImages.value = {}
+      artists.value = normalizeArtists(JSON.parse(JSON.stringify(DEFAULT_ARTISTS)))
+      currentView.value = 'artists'; activeTab.value = ''; customImages.value = {}
       viewedArtists.value = []; viewedWorks.value = []; artistSortBy.value = 'nameAsc'
       localStorage.setItem('artists', JSON.stringify(artists.value)); showToast('Reset complete')
     })
@@ -839,16 +943,35 @@
   <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  /* ─── CSS Variables — light & dark ─── */
   :root {
     --bg: #F8F6F2; --surface: #FFFFFF; --ink: #1A1A1A; --ink2: #6B6560; --ink3: #A09A93;
     --warm: #C8785A; --warm-bg: #FDF0EB; --warm-dark: #9E5A3E;
     --line: #E6E1DB; --line2: #D5CFC8; --r: 8px; --t: 180ms ease;
     --mono: 'IBM Plex Mono', monospace; --sans: 'DM Sans', -apple-system, sans-serif;
   }
-  html, body { font-family: var(--sans); background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
+  .dark {
+    --bg: #111110; --surface: #1C1B19; --ink: #F0EDE8; --ink2: #9A948D; --ink3: #5C5852;
+    --warm: #D4845F; --warm-bg: #2A1E18; --warm-dark: #E8A080;
+    --line: #2A2925; --line2: #353330;
+  }
+  html, body { font-family: var(--sans); background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; transition: background .2s, color .2s; }
   .app { min-height: 100vh; }
-  .bar { position: fixed; top: 0; left: 0; right: 0; height: 54px; z-index: 100; background: var(--surface); border-bottom: 2px solid var(--ink); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; gap: 12px; }
-  .bar-left, .bar-right { display: flex; align-items: center; gap: 10px; }
+  
+  /* ─── Loading screen ─── */
+  .app-loading { position: fixed; inset: 0; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; z-index: 9999; }
+  .loading-logo { width: 56px; height: 56px; border: 3px solid var(--ink); border-radius: 12px; display: flex; align-items: center; justify-content: center; font: 700 28px var(--mono); color: var(--ink); animation: pulse 1s ease-in-out infinite alternate; }
+  @keyframes pulse { from { opacity: .5; transform: scale(.95); } to { opacity: 1; transform: scale(1); } }
+  .loading-bar { width: 120px; height: 3px; background: var(--line); border-radius: 2px; overflow: hidden; }
+  .loading-fill { height: 100%; background: var(--warm); border-radius: 2px; animation: loadbar 1s ease-in-out infinite; }
+  @keyframes loadbar { 0% { width:0; margin-left:0; } 50% { width:60%; margin-left:20%; } 100% { width:0; margin-left:100%; } }
+  .app-load-leave-active { transition: opacity .25s ease; }
+  .app-load-leave-to { opacity: 0; }
+  
+  /* ─── Bar ─── */
+  .bar { position: fixed; top: 0; left: 0; right: 0; height: 54px; z-index: 100; background: var(--surface); border-bottom: 2px solid var(--ink); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; gap: 12px; transition: background .2s, border-color .2s; }
+  .bar-left, .bar-right { display: flex; align-items: center; gap: 8px; }
   .bar-right { flex-shrink: 0; }
   .stats { display: flex; align-items: center; gap: 4px; font-size: 13px; color: var(--ink2); }
   .stats b { color: var(--ink); font-weight: 700; }
@@ -867,13 +990,16 @@
   .bar-total-count { font: 500 11px var(--mono); color: var(--warm); }
   .search-box { position: relative; display: flex; align-items: center; }
   .search-ico { position: absolute; left: 10px; color: var(--ink3); pointer-events: none; }
-  .search-box input { width: 160px; padding: 8px 28px 8px 30px; border: 2px solid var(--line); border-radius: var(--r); background: var(--bg); font: 13px var(--sans); color: var(--ink); transition: border-color var(--t); }
+  .search-box input { width: 160px; padding: 8px 28px 8px 30px; border: 2px solid var(--line); border-radius: var(--r); background: var(--bg); font: 13px var(--sans); color: var(--ink); transition: border-color var(--t), background .2s; }
   .search-box input:focus { outline: none; border-color: var(--ink); }
   .search-box input::placeholder { color: var(--ink3); }
   .search-x { position: absolute; right: 6px; width: 20px; height: 20px; background: var(--line); border: none; border-radius: 50%; cursor: pointer; font-size: 14px; color: var(--ink2); display: flex; align-items: center; justify-content: center; }
   .btn-filter { padding: 5px 11px; border: 1.5px solid var(--line2); border-radius: 20px; background: var(--surface); font: 600 11px var(--sans); color: var(--ink2); cursor: pointer; transition: all var(--t); white-space: nowrap; }
   .btn-filter:hover { border-color: var(--ink); color: var(--ink); background: var(--bg); }
   .btn-filter.active { background: var(--warm); border-color: var(--warm); color: #fff; }
+  .btn-icon { width: 32px; height: 32px; border: 1.5px solid var(--line2); border-radius: 6px; background: var(--surface); cursor: pointer; color: var(--ink2); display: flex; align-items: center; justify-content: center; transition: all var(--t); flex-shrink: 0; }
+  .btn-icon:hover { border-color: var(--ink); color: var(--ink); }
+  .btn-icon.active { background: var(--warm-bg); border-color: var(--warm); color: var(--warm-dark); }
   .menu-wrap { position: relative; }
   .btn-menu { width: 32px; height: 32px; border: 1.5px solid var(--line2); border-radius: 6px; background: var(--surface); cursor: pointer; color: var(--ink2); display: flex; align-items: center; justify-content: center; transition: all var(--t); }
   .btn-menu:hover { border-color: var(--ink); color: var(--ink); }
@@ -884,17 +1010,26 @@
   .menu-drop .menu-danger:hover { background: #FEF0F0; }
   .menu-backdrop { position: fixed; inset: 0; z-index: 99; }
   .page { padding: 74px 24px 48px; max-width: 1400px; margin: 0 auto; }
+  
+  /* ─── Pull-to-refresh ─── */
+  .ptr-indicator { display: flex; align-items: center; justify-content: center; overflow: hidden; transition: height .15s ease; color: var(--ink3); }
+  
+  /* ─── Skeleton ─── */
   .skeleton { position: absolute; inset: 0; background: linear-gradient(90deg, var(--line) 25%, var(--line2) 50%, var(--line) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: inherit; }
   @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
   .fade-img { opacity: 0; transition: opacity .3s ease; position: relative; z-index: 1; }
   .fade-img.loaded { opacity: 1; }
+  
+  /* ─── Alpha rail ─── */
   .alpha-rail { position: fixed; right: 6px; top: 54px; bottom: 0; z-index: 60; display: flex; flex-direction: column; justify-content: center; padding: 8px 0; }
   .alpha-rail button { display: block; padding: 1px 4px; border: none; background: none; font: 600 9px var(--mono); color: var(--ink3); cursor: pointer; line-height: 1.4; transition: color var(--t); }
   .alpha-rail button.active { color: var(--ink); }
   .alpha-rail button:disabled { opacity: .25; cursor: default; }
   .alpha-rail button:hover:not(:disabled) { color: var(--warm); }
+  
+  /* ─── Artists ─── */
   .group { margin-bottom: 36px; }
-  .group-head { position: sticky; top: 54px; z-index: 50; display: flex; align-items: baseline; gap: 8px; padding: 10px 0; margin-bottom: 16px; background: var(--bg); border-bottom: 2px solid var(--ink); }
+  .group-head { position: sticky; top: 54px; z-index: 50; display: flex; align-items: baseline; gap: 8px; padding: 10px 0; margin-bottom: 16px; background: var(--bg); border-bottom: 2px solid var(--ink); transition: background .2s; }
   .letter { font-size: 28px; font-weight: 700; letter-spacing: -1.5px; line-height: 1; }
   .group-n { font-size: 13px; color: var(--ink3); font-weight: 600; }
   .grid-artists { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; padding-right: 20px; }
@@ -907,28 +1042,35 @@
   .a-img img { width: 100%; height: 100%; object-fit: cover; }
   .a-card:hover .a-img img { transform: scale(1.04); transition: transform .3s ease; }
   .a-ph { position: relative; z-index: 1; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 48px; font-weight: 700; color: var(--line2); background: var(--bg); }
-  .a-overlay { position: absolute; bottom: 0; left: 0; right: 0; z-index: 2; padding: 24px 12px 10px; background: linear-gradient(transparent, rgba(0,0,0,.65)); display: flex; justify-content: space-between; align-items: baseline; }
+  .a-overlay { position: absolute; bottom: 0; left: 0; right: 0; z-index: 2; padding: 24px 12px 10px; background: linear-gradient(transparent, rgba(0,0,0,.7)); display: flex; justify-content: space-between; align-items: baseline; }
   .a-name { font-size: 13px; font-weight: 700; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.4); }
-  .a-count { font-size: 11px; font-family: var(--mono); color: rgba(255,255,255,.7); }
+  .a-count { font-size: 11px; font-family: var(--mono); color: rgba(255,255,255,.9); font-weight: 600; }
   .progress-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: rgba(0,0,0,.3); z-index: 3; }
   .progress-fill { height: 100%; background: var(--warm); transition: width .3s ease; border-radius: 0 2px 2px 0; }
   .badge-check { position: absolute; top: 8px; left: 8px; z-index: 4; width: 22px; height: 22px; border-radius: 50%; background: var(--warm); color: #fff; display: flex; align-items: center; justify-content: center; }
   .badge-check.tl { top: 6px; left: 6px; width: 20px; height: 20px; }
+  
+  /* ─── Works ─── */
   .works-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 12px; flex-wrap: wrap; }
   .works-info { flex: 1; }
-  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .chip { padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; font-family: var(--mono); border: 1.5px solid var(--line2); color: var(--ink2); background: var(--surface); }
   .chip-progress { border-color: var(--warm); color: var(--warm-dark); background: var(--warm-bg); }
+  .chip-url { text-decoration: none; display: inline-flex; align-items: center; gap: 5px; transition: all var(--t); }
+  .chip-url:hover { border-color: var(--warm); color: var(--warm-dark); background: var(--warm-bg); }
   .works-actions { display: flex; gap: 8px; align-items: center; }
-  .sort-select { padding: 6px 10px; border: 1.5px solid var(--line2); border-radius: 6px; font: 500 12px var(--sans); color: var(--ink2); background: var(--surface); cursor: pointer; height: 32px; }
+  .sort-select { padding: 6px 10px; border: 1.5px solid var(--line2); border-radius: 6px; font: 500 12px var(--sans); color: var(--ink2); background: var(--surface); cursor: pointer; height: 32px; transition: background .2s; }
   .sort-select:focus { outline: none; border-color: var(--ink); }
-  .btn-add { padding: 0 16px; height: 32px; background: var(--ink); color: var(--surface); border: 2px solid var(--ink); border-radius: 6px; font: 600 12px var(--sans); cursor: pointer; white-space: nowrap; transition: all var(--t); display: flex; align-items: center; gap: 4px; }
-  .btn-add:hover { background: #000; }
+  .btn-add { padding: 0 16px; height: 32px; background: var(--ink); color: var(--surface); border: 2px solid var(--ink); border-radius: 6px; font: 600 12px var(--sans); cursor: pointer; white-space: nowrap; transition: opacity var(--t); display: flex; align-items: center; gap: 4px; }
+  .btn-add:hover { opacity: .8; }
   .w-section { margin-bottom: 36px; }
   .w-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid var(--line); }
   .w-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--ink2); }
   .w-n { font-size: 12px; color: var(--ink3); font-family: var(--mono); }
   .grid-works { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; }
+  .grid-works.compact { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+  .grid-works.compact .w-img { margin-bottom: 4px; }
+  .grid-works.compact .w-code { font-size: 10px; }
   .w-card { position: relative; cursor: pointer; transition: transform .2s ease, opacity var(--t); }
   .w-card:hover { transform: translateY(-3px); }
   .w-card.dim { opacity: .4; }
@@ -939,6 +1081,8 @@
   .w-card:hover .w-img img { transform: scale(1.04); transition: transform .3s ease; }
   .badge-star { position: absolute; top: 6px; right: 6px; z-index: 2; width: 22px; height: 22px; border-radius: 50%; background: var(--warm); color: #fff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
   .w-code { font: 600 12px var(--mono); color: var(--ink); display: block; padding: 0 2px; }
+  
+  /* ─── Detail ─── */
   .detail { display: grid; grid-template-columns: 1fr 420px; gap: 32px; }
   .detail-left { display: flex; flex-direction: column; gap: 12px; }
   .big-img { position: relative; width: 100%; aspect-ratio: 3/2; border: 2px solid var(--ink); border-radius: var(--r); overflow: hidden; cursor: pointer; background: var(--bg); }
@@ -955,8 +1099,10 @@
   .act-copy:hover { background: var(--ink); color: var(--surface); }
   .detail-right { display: flex; flex-direction: column; gap: 12px; }
   .d-code { font: 700 24px var(--mono); letter-spacing: -0.5px; word-break: break-all; padding: 14px 18px; border: 2px solid var(--ink); border-radius: var(--r); background: var(--surface); }
+  .artist-url-row { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1.5px solid var(--line2); border-radius: var(--r); font: 500 12px var(--mono); color: var(--ink2); text-decoration: none; background: var(--surface); transition: all var(--t); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .artist-url-row:hover { border-color: var(--warm); color: var(--warm-dark); background: var(--warm-bg); }
   .detail-section { background: var(--surface); border: 1.5px solid var(--line2); border-radius: var(--r); overflow: hidden; }
-  .section-header { display: flex; align-items: center; gap: 7px; padding: 10px 16px; font: 700 11px var(--sans); text-transform: uppercase; letter-spacing: .8px; color: var(--ink2); background: var(--bg); border-bottom: 1.5px solid var(--line2); }
+  .section-header { display: flex; align-items: center; gap: 7px; padding: 10px 16px; font: 700 11px var(--sans); text-transform: uppercase; letter-spacing: .8px; color: var(--ink2); background: var(--bg); border-bottom: 1.5px solid var(--line2); transition: background .2s; }
   .section-header svg { color: var(--ink3); flex-shrink: 0; }
   .section-header .btn-sm { margin-left: auto; }
   .link-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line2); }
@@ -978,6 +1124,8 @@
   .thumb img { width: 100%; height: 100%; object-fit: cover; }
   .t-n { position: absolute; bottom: 2px; right: 4px; font: 700 9px var(--mono); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.7); z-index: 2; }
   .gallery-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 28px 0 20px; color: var(--ink3); font-size: 13px; }
+  
+  /* ─── Modals ─── */
   .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; z-index: 300; padding: 20px; }
   .modal { width: 100%; max-width: 420px; background: var(--surface); border: 2px solid var(--ink); border-radius: var(--r); overflow: hidden; }
   .m-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 2px solid var(--ink); }
@@ -988,7 +1136,7 @@
   .m-foot { display: flex; gap: 8px; padding: 16px 20px; border-top: 2px solid var(--line); background: var(--bg); }
   .field { display: block; margin-bottom: 16px; }
   .field span { display: block; font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: .5px; color: var(--ink2); margin-bottom: 6px; }
-  .field input, .field select { width: 100%; padding: 10px 14px; border: 2px solid var(--line); border-radius: var(--r); font: 14px var(--sans); color: var(--ink); background: var(--bg); transition: border-color var(--t); }
+  .field input, .field select { width: 100%; padding: 10px 14px; border: 2px solid var(--line); border-radius: var(--r); font: 14px var(--sans); color: var(--ink); background: var(--bg); transition: border-color var(--t), background .2s; }
   .field input:focus, .field select:focus { outline: none; border-color: var(--ink); }
   .hint { font-size: 11px; color: var(--ink3); margin-top: -8px; }
   .radios { display: flex; gap: 8px; }
@@ -1000,7 +1148,25 @@
   .btn-flat { background: var(--surface); color: var(--ink2); border-color: var(--line); }
   .btn-flat:hover { border-color: var(--ink); color: var(--ink); }
   .btn-fill { background: var(--ink); color: var(--surface); border-color: var(--ink); }
-  .btn-fill:hover { background: #000; }
+  .btn-fill:hover { opacity: .85; }
+  
+  /* ─── Bottom Sheet ─── */
+  .sheet-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 300; display: flex; align-items: flex-end; }
+  .bottom-sheet { width: 100%; background: var(--surface); border-radius: 16px 16px 0 0; padding: 12px 20px 36px; border-top: 2px solid var(--ink); display: flex; flex-direction: column; gap: 20px; }
+  .sheet-handle { width: 40px; height: 4px; background: var(--line2); border-radius: 2px; margin: 0 auto 4px; }
+  .sheet-title { font: 700 16px var(--sans); }
+  .sheet-section { display: flex; flex-direction: column; gap: 10px; }
+  .sheet-label { font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: .6px; color: var(--ink3); }
+  .sheet-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill { padding: 7px 16px; border: 1.5px solid var(--line2); border-radius: 20px; background: var(--surface); font: 600 13px var(--sans); color: var(--ink2); cursor: pointer; transition: all var(--t); }
+  .pill.active { background: var(--warm); border-color: var(--warm); color: #fff; }
+  .sheet-done { padding: 14px; background: var(--ink); color: var(--surface); border: none; border-radius: var(--r); font: 700 15px var(--sans); cursor: pointer; transition: opacity var(--t); }
+  .sheet-done:hover { opacity: .85; }
+  .sheet-enter-active { transition: transform .3s cubic-bezier(.32,0,.67,0); }
+  .sheet-leave-active { transition: transform .2s ease; }
+  .sheet-enter-from, .sheet-leave-to { transform: translateY(100%); }
+  
+  /* ─── Lightbox ─── */
   .lb { position: fixed; inset: 0; background: rgba(0,0,0,.95); display: flex; align-items: center; justify-content: center; z-index: 400; touch-action: pan-y pinch-zoom; }
   .lb-close { position: fixed; top: 16px; right: 16px; width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(255,255,255,.2); background: rgba(255,255,255,.08); color: #fff; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background var(--t); }
   .lb-close:hover { background: rgba(255,255,255,.15); }
@@ -1012,6 +1178,8 @@
   .lb-arr.left { left: 20px; }
   .lb-arr.right { right: 20px; }
   .lb-count { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); padding: 8px 20px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 20px; color: #fff; font: 600 13px var(--mono); }
+  
+  /* ─── Toast ─── */
   .toast { position: fixed; bottom: 28px; right: 28px; padding: 12px 20px; border-radius: var(--r); border: 2px solid; font: 600 13px var(--sans); z-index: 500; background: var(--surface); }
   .toast.success { border-color: var(--warm); color: var(--warm-dark); }
   .toast.error { border-color: #C44; color: #A33; }
@@ -1020,6 +1188,8 @@
   .shortcut-hint { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(12px); padding: 8px 14px; background: var(--surface); border: 2px solid var(--line2); border-radius: 20px; font: 500 12px var(--sans); color: var(--ink3); z-index: 50; opacity: 0; pointer-events: none; transition: opacity .3s ease, transform .3s ease; white-space: nowrap; }
   .shortcut-hint.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
   .shortcut-hint kbd { display: inline-block; padding: 1px 6px; background: var(--bg); border: 1.5px solid var(--line2); border-radius: 4px; font: 700 11px var(--mono); color: var(--ink2); margin-right: 4px; }
+  
+  /* ─── Transitions ─── */
   .fade-enter-active, .fade-leave-active { transition: opacity .2s; }
   .fade-enter-from, .fade-leave-to { opacity: 0; }
   .m-enter-active { transition: all .25s cubic-bezier(.4,0,.2,1); }
@@ -1038,11 +1208,14 @@
   .slide-right-leave-to { opacity: 0; transform: translateX(-24px); }
   .slide-left-enter-from { opacity: 0; transform: translateX(-24px); }
   .slide-left-leave-to { opacity: 0; transform: translateX(24px); }
+  
+  /* ─── Responsive ─── */
   @media (max-width: 1200px) { .detail { grid-template-columns: 1fr; } }
   @media (min-width: 769px) and (max-width: 1024px) {
     .search-box input { width: 130px; }
     .grid-artists { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
     .grid-works { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .grid-works.compact { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
   }
   @media (max-width: 768px) {
     .bar { padding: 0 14px; height: 50px; gap: 8px; }
@@ -1053,6 +1226,7 @@
     .letter { font-size: 24px; }
     .grid-artists { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
     .grid-works { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+    .grid-works.compact { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 6px; }
     .gallery { grid-template-columns: repeat(4, 1fr); }
     .alpha-rail { right: 2px; }
     .alpha-rail button { font-size: 8px; padding: 1px 3px; }
@@ -1062,15 +1236,14 @@
     .stats { display: none; }
     .bar-title { max-width: 120px; }
     .search-box input { width: 90px; }
-    .btn-filter { padding: 6px 8px; font-size: 10px; }
     .page { padding: 60px 12px 28px; }
     .group-head { top: 50px; }
     .letter { font-size: 22px; }
     .grid-artists { grid-template-columns: repeat(2, 1fr); gap: 10px; padding-right: 18px; }
     .grid-works { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .grid-works.compact { grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .works-top { flex-direction: column; align-items: stretch; }
-    .works-actions { justify-content: space-between; }
-    .btn-add { flex: 1; text-align: center; }
+    .works-actions { justify-content: flex-end; }
     .actions { flex-direction: column; }
     .gallery { grid-template-columns: repeat(3, 1fr); }
     .link-grid { grid-template-columns: 1fr; }
