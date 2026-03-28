@@ -1,24 +1,11 @@
 <template>
     <!-- ── Desktop: floating hover-expand pill ── -->
     <nav class="nav-desk">
-        <div class="pill-wrap" v-click-outside="closeDropdown">
-            <div class="pill" :class="{ expanded: isExpanded }" @mouseenter="isExpanded = true"
-                @mouseleave="isExpanded = false">
-
-                <!-- Logo icon — always visible -->
-                <NuxtLink to="/" class="logo-btn">
-                    <div class="logo-sq">
-                        <svg viewBox="0 0 14 14" fill="none">
-                            <rect x="2" y="2" width="4" height="4" rx="1" fill="white" opacity="0.9" />
-                            <rect x="8" y="2" width="4" height="4" rx="1" fill="white" opacity="0.6" />
-                            <rect x="2" y="8" width="4" height="4" rx="1" fill="white" opacity="0.6" />
-                            <rect x="8" y="8" width="4" height="4" rx="1" fill="white" opacity="0.3" />
-                        </svg>
-                    </div>
-                </NuxtLink>
+        <div class="pill-wrap" v-click-outside="closeDropdown" @mouseenter="onEnter" @mouseleave="onLeave">
+            <div ref="pillRef" class="pill" :class="{ expanded: isExpanded }" :style="pillStyle">
 
                 <!-- Expandable content -->
-                <div class="pill-content" :class="{ visible: isExpanded }">
+                <div ref="pillContentRef" class="pill-content" :class="{ visible: isExpanded }">
                     <span class="logo-name">MyApp</span>
                     <div class="divider" />
 
@@ -55,6 +42,18 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Logo icon — always visible, sits at the right end -->
+                <NuxtLink to="/" class="logo-btn">
+                    <div class="logo-sq">
+                        <svg viewBox="0 0 14 14" fill="none">
+                            <rect x="2" y="2" width="4" height="4" rx="1" fill="white" opacity="0.9" />
+                            <rect x="8" y="2" width="4" height="4" rx="1" fill="white" opacity="0.6" />
+                            <rect x="2" y="8" width="4" height="4" rx="1" fill="white" opacity="0.6" />
+                            <rect x="8" y="8" width="4" height="4" rx="1" fill="white" opacity="0.3" />
+                        </svg>
+                    </div>
+                </NuxtLink>
             </div>
 
             <!-- Hover hint tooltip (only when collapsed) -->
@@ -118,10 +117,48 @@
 const router = useRouter()
 const route = useRoute()
 
+// ── Refs ───────────────────────────────────────────────────────────────────
+const pillRef = ref<HTMLElement | null>(null)
+const pillContentRef = ref<HTMLElement | null>(null)
+const expandedWidth = ref(44)
+
+// Measure the natural scrollWidth of the content + logo (36px) + padding (14px each side) + divider gap
+const measureWidth = () => {
+    nextTick(() => {
+        if (!pillContentRef.value) return
+        // Temporarily make content visible for measurement
+        const el = pillContentRef.value
+        el.style.opacity = '1'
+        el.style.pointerEvents = 'none'
+        const contentW = el.scrollWidth
+        el.style.opacity = ''
+        el.style.pointerEvents = ''
+        // 36 (logo) + 4 (logo padding) + 7 (right padding) + 7 (left padding) + content
+        expandedWidth.value = 36 + 4 + 7 + 7 + contentW
+    })
+}
+
+const pillStyle = computed(() => ({
+    width: isExpanded.value ? `${expandedWidth.value}px` : '44px'
+}))
+
 // ── State ─────────────────────────────────────────────────────────────────
 const isExpanded = ref(false)
 const dropOpen = ref(false)
 const sheetOpen = ref(false)
+let closeTimer: ReturnType<typeof setTimeout> | null = null
+
+const onEnter = () => {
+    if (closeTimer) { clearTimeout(closeTimer); closeTimer = null }
+    isExpanded.value = true
+}
+
+const onLeave = () => {
+    closeTimer = setTimeout(() => {
+        isExpanded.value = false
+        dropOpen.value = false
+    }, 320)
+}
 
 // ── Route list ──────────────────────────────────────────────────────────────
 const allRoutes = computed(() =>
@@ -144,7 +181,7 @@ const overflowHasActive = computed(() => overflowRoutes.value.some(r => isActive
 const mobileOverflowHasActive = computed(() => mobileOverflow.value.some(r => isActive(r.path)))
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-const isActive = (path: string) => route.path.startsWith(path)
+const isActive = (path: string) => route.path === path || route.path.startsWith(path + '/')
 const routeLabel = (path: string) => {
     const s = path.replace('/', '')
     return s.charAt(0).toUpperCase() + s.slice(1)
@@ -156,10 +193,15 @@ const closeDropdown = () => {
 
 // Close on route change
 watch(() => route.path, () => {
+    if (closeTimer) { clearTimeout(closeTimer); closeTimer = null }
     sheetOpen.value = false
     dropOpen.value = false
     isExpanded.value = false
 })
+
+// Re-measure when routes are available / change
+watch(allRoutes, measureWidth, { immediate: false })
+onMounted(measureWidth)
 
 // ── Icons ───────────────────────────────────────────────────────────────────
 const icons: Record<string, string> = {
@@ -201,19 +243,22 @@ const routeIcon = (path: string) =>
     display: none;
 }
 
-/* Wrapper holds pill + hint tooltip */
+/* Wrapper holds pill + hint tooltip — padding creates invisible hover buffer */
 .pill-wrap {
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
+    padding: 12px;
+    margin: -12px;
 }
 
 /* ── Pill shell ── */
 .pill {
     display: flex;
-    flex-direction: row-reverse;
+    flex-direction: row;
     align-items: center;
+    justify-content: center;
     gap: 0;
     height: 44px;
     padding: 4px;
@@ -235,7 +280,7 @@ const routeIcon = (path: string) =>
 }
 
 .pill.expanded {
-    width: var(--pill-expanded-width, 540px);
+    justify-content: flex-end;
     padding: 4px 7px;
     box-shadow:
         0 2px 6px rgba(0, 0, 0, 0.06),
@@ -243,13 +288,17 @@ const routeIcon = (path: string) =>
         inset 0 0.5px 0 rgba(255, 255, 255, 0.9);
 }
 
-/* ── Logo button (always visible) ── */
+/* ── Logo button (always visible, last in DOM = rightmost) ── */
 .logo-btn {
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     text-decoration: none;
+}
+
+.pill.expanded .logo-btn {
+    margin-left: 0;
 }
 
 .logo-sq {
@@ -277,17 +326,20 @@ const routeIcon = (path: string) =>
 .pill-content {
     display: flex;
     align-items: center;
-    flex-direction: row-reverse;
     gap: 2px;
     opacity: 0;
+    width: 0;
+    overflow: hidden;
     pointer-events: none;
-    transition: opacity 0.16s 0.10s ease;
-    /* small delay so it fades in after pill opens */
+    transition: opacity 0.16s 0.10s ease, width 0s 0.32s;
 }
 
 .pill-content.visible {
     opacity: 1;
+    width: auto;
+    overflow: visible;
     pointer-events: auto;
+    transition: opacity 0.16s 0.10s ease;
 }
 
 .logo-name {
@@ -295,7 +347,7 @@ const routeIcon = (path: string) =>
     font-weight: 600;
     color: #111;
     letter-spacing: -0.01em;
-    padding: 0 7px 0 8px;
+    padding: 0 8px 0 7px;
     flex-shrink: 0;
 }
 
