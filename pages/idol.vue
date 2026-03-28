@@ -202,20 +202,27 @@
               <img :src="getProgressiveWorkImage(currentWork).full" :alt="currentWork.code" class="fade-img" @load="onImgLoad" @error="onImgError" />
             </div>
             <div class="actions">
-              <div class="act-group">
-                <button @click="setCoverWork(currentArtist.name, currentWork.code)" class="act" :class="{ 'act--on': isCoverWork(currentArtist.name, currentWork.code) }">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                  {{ isCoverWork(currentArtist.name, currentWork.code) ? 'Cover' : 'Set cover' }}
+              <div class="actions-btns">
+                <button @click="setCoverWork(currentArtist.name, currentWork.code)" class="act-btn" :class="{ 'act-btn--on': isCoverWork(currentArtist.name, currentWork.code) }">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  <span>{{ isCoverWork(currentArtist.name, currentWork.code) ? 'Cover' : 'Set cover' }}</span>
                 </button>
-                <button @click="openUploadModal(currentWork.code)" class="act">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                  {{ hasCustomImage(currentWork.code) ? 'Update img' : 'Add image' }}
+                <button @click="openUploadModal(currentWork.code)" class="act-btn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  <span>{{ hasCustomImage(currentWork.code) ? 'Update img' : 'Add image' }}</span>
+                </button>
+                <button @click="copyToClipboard(currentWork.code)" class="act-btn act-btn--primary">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                  <span>Copy code</span>
                 </button>
               </div>
-              <div class="act-group">
-                <button @click="copyToClipboard(currentWork.code)" class="act act--copy">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-                  Copy code
+              <div v-if="currentWorkList.length > 1" class="actions-nav">
+                <button @click="navigateWork(-1)" :disabled="!canNavigateWork(-1)" class="nav-btn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+                </button>
+                <span class="nav-pos">{{ currentWorkIndex + 1 }} <small>of {{ currentWorkList.length }}</small></span>
+                <button @click="navigateWork(1)" :disabled="!canNavigateWork(1)" class="nav-btn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
                 </button>
               </div>
             </div>
@@ -237,15 +244,6 @@
                   {{ link.label }}
                 </button>
               </div>
-            </div>
-            <div v-if="currentWorkList.length > 1" class="nav-row">
-              <button @click="navigateWork(-1)" :disabled="!canNavigateWork(-1)" class="nav-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
-              </button>
-              <span class="nav-pos">{{ currentWorkIndex + 1 }} <small>of {{ currentWorkList.length }}</small></span>
-              <button @click="navigateWork(1)" :disabled="!canNavigateWork(1)" class="nav-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
-              </button>
             </div>
             <div class="detail-section">
               <div class="section-header">
@@ -1561,42 +1559,68 @@ function hardRefresh() {
 }
 .big-img img { width: 100%; height: 100%; object-fit: contain; }
 
+/* ─── Actions panel ─── */
 .actions {
-  display: flex;
-  align-items: center;
-  background: var(--surface);
   border: 1.5px solid var(--line2);
   border-radius: var(--r);
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  white-space: nowrap;
+  overflow: hidden;
+  background: var(--surface);
 }
-.act-group { display: inline-flex; align-items: center; flex-shrink: 0; }
-.act-group + .act-group { border-inline-start: 1.5px solid var(--line2); }
 
-.act {
-  padding-inline: 14px;
-  height: 40px;
+/* Top row: equal-width icon buttons */
+.actions-btns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-block-end: 1.5px solid var(--line2);
+}
+.act-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 14px 8px;
   border: none;
   border-inline-end: 1.5px solid var(--line2);
   background: transparent;
-  font: 600 12px var(--sans);
-  color: var(--ink2);
   cursor: pointer;
+  color: var(--ink2);
   transition: background var(--t), color var(--t);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  flex-shrink: 0;
+  font: 500 11px var(--sans);
+  text-align: center;
+  min-width: 0;
 }
-.act:last-child { border-inline-end: none; }
-.act:hover { background: var(--bg); color: var(--ink); }
-.act--on { background: var(--warm-bg); color: var(--warm-dark); }
-.act--on svg { color: var(--warm); }
-.act--copy { color: var(--ink); font-weight: 700; }
-.act--copy:hover { background: var(--ink); color: var(--surface); }
+.act-btn:last-child { border-inline-end: none; }
+.act-btn span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.act-btn:hover { background: var(--bg); color: var(--ink); }
+.act-btn--on { background: var(--warm-bg); color: var(--warm-dark); }
+.act-btn--on svg { color: var(--warm); }
+.act-btn--primary { color: var(--ink); font-weight: 700; }
+.act-btn--primary:hover { background: var(--ink); color: var(--surface); }
+
+/* Bottom row: prev / counter / next */
+.actions-nav {
+  display: flex;
+  align-items: center;
+  height: 48px;
+}
+.nav-btn {
+  height: 48px;
+  width: 52px;
+  flex-shrink: 0;
+  border: none;
+  border-inline-end: 1.5px solid var(--line2);
+  background: transparent;
+  cursor: pointer;
+  color: var(--ink2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--t), color var(--t);
+}
+.nav-btn:last-child { border-inline-end: none; border-inline-start: 1.5px solid var(--line2); }
+.nav-btn:hover:not(:disabled) { background: var(--bg); color: var(--ink); }
+.nav-btn:disabled { opacity: 0.25; cursor: not-allowed; }
 
 .d-code {
   font: 700 24px var(--mono);
@@ -1673,31 +1697,7 @@ function hardRefresh() {
 .link-btn:hover { background: var(--warm-bg); color: var(--warm-dark); }
 .link-btn:hover svg { color: var(--warm); }
 
-.nav-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  border: 1.5px solid var(--line2);
-  border-radius: var(--r);
-  background: var(--surface);
-}
-.nav-btn {
-  width: 36px;
-  height: 36px;
-  border: 1.5px solid var(--line2);
-  border-radius: 6px;
-  background: var(--bg);
-  cursor: pointer;
-  color: var(--ink);
-  transition: background var(--t), color var(--t), border-color var(--t);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.nav-btn:hover:not(:disabled) { background: var(--ink); color: var(--surface); border-color: var(--ink); }
-.nav-btn:disabled { opacity: 0.2; cursor: not-allowed; }
-.nav-pos { font: 700 15px var(--mono); }
+.nav-pos { font: 700 13px var(--mono); flex: 1; text-align: center; white-space: nowrap; }
 .nav-pos small { font-weight: 400; color: var(--ink3); }
 
 .btn-sm {
@@ -2144,7 +2144,6 @@ function hardRefresh() {
   .grid-works--compact { grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .works-top { flex-direction: column; align-items: stretch; }
   .works-actions { justify-content: flex-end; }
-  .actions { flex-direction: column; }
   .gallery { grid-template-columns: repeat(3, 1fr); }
   .link-grid { grid-template-columns: 1fr; }
   .toast { inset-inline: 12px; inset-block-end: 12px; }
