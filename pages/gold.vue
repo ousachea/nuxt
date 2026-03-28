@@ -220,7 +220,9 @@
                                 </div>
                                 <div class="pcard-row highlight" :class="gainClass(p)">
                                     <span>{{ t.gainLoss }}</span>
-                                    <span>{{ gainLoss(p) >= 0 ? '+' : '' }}${{ gainLoss(p).toFixed(2) }}</span>
+                                    <span :style="{ color: gainLoss(p) >= 0 ? 'var(--gain)' : 'var(--loss)' }">
+                                        {{ gainLoss(p) >= 0 ? '+' : '' }}${{ gainLoss(p).toFixed(2) }}
+                                    </span>
                                 </div>
                             </div>
                             <span class="pcard-date">{{ formatDate(p.date) }}</span>
@@ -271,7 +273,9 @@
                         </div>
                         <div class="sum-item" :class="totalGL >= 0 ? 'gain' : 'loss'">
                             <span class="sum-label">{{ t.totalGainLoss }}</span>
-                            <span class="sum-val">{{ totalGL >= 0 ? '+' : '' }}${{ totalGL.toFixed(2) }}</span>
+                            <span class="sum-val" :style="{ color: totalGL >= 0 ? 'var(--gain)' : 'var(--loss)' }">
+                                {{ totalGL >= 0 ? '+' : '' }}${{ totalGL.toFixed(2) }}
+                            </span>
                         </div>
                     </div>
                     <button class="export-btn" @click="exportCSV">↓ {{ t.exportCSV }}</button>
@@ -519,7 +523,6 @@ async function fetchPrice() {
             const r = await fetch('https://api.gold-api.com/price/XAU', { mode: 'cors' })
             if (r.ok) {
                 const d = await r.json()
-                // Response: { symbol: "XAU", price: 3082.45, ... }
                 const p = d?.price ?? d?.ask ?? d?.bid
                 if (p && !isNaN(p)) { goldPrice.value = parseFloat(p); ok = true }
                 else errors.push('gold-api.com: unexpected shape — ' + JSON.stringify(d).slice(0, 80))
@@ -1707,12 +1710,13 @@ body {
     font-weight: 600;
 }
 
+/* ── Gain / Loss colors — purchase cards ── */
 .pcard-row.highlight.gain span:last-child {
-    color: var(--gain);
+    color: var(--gain) !important;
 }
 
 .pcard-row.highlight.loss span:last-child {
-    color: var(--loss);
+    color: var(--loss) !important;
 }
 
 .pcard-date {
@@ -1806,12 +1810,13 @@ body {
     line-height: 1.3;
 }
 
+/* ── Gain / Loss colors — summary ── */
 .sum-item.gain .sum-val {
-    color: var(--gain);
+    color: var(--gain) !important;
 }
 
 .sum-item.loss .sum-val {
-    color: var(--loss);
+    color: var(--loss) !important;
 }
 
 .export-btn {
