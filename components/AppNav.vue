@@ -48,16 +48,6 @@
                     </Transition>
                 </div>
             </div>
-
-            <!-- Search -->
-            <div class="d-search" @click="$emit('search')">
-                <svg viewBox="0 0 16 16" fill="none" width="13" height="13">
-                    <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.4" />
-                    <path d="M10.5 10.5L13 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
-                </svg>
-                <span>Search</span>
-                <kbd>⌘K</kbd>
-            </div>
         </div>
     </nav>
 
@@ -111,7 +101,6 @@
 </template>
 
 <script setup lang="ts">
-defineEmits(['search'])
 
 const router = useRouter()
 const route = useRoute()
@@ -388,28 +377,6 @@ watch(() => route.path, () => { sheetOpen.value = false; dropOpen.value = false 
 
 .drop-item.active .drop-path {
     color: rgba(124, 107, 255, 0.45);
-}
-
-/* Search */
-.d-search {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    padding: 5px 9px;
-    margin-left: 3px;
-    border-radius: 9px;
-    border: 0.5px solid rgba(0, 0, 0, 0.10);
-    background: #fafafa;
-    font-size: 12.5px;
-    color: #999;
-    cursor: pointer;
-    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-    transition: border-color 0.15s, color 0.15s;
-}
-
-.d-search:hover {
-    border-color: rgba(0, 0, 0, 0.18);
-    color: #444;
 }
 
 kbd {
