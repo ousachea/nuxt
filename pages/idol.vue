@@ -336,12 +336,30 @@
 
     <!-- Lightbox -->
     <Transition name="fade">
-      <div v-if="lightbox.show" class="lb" @click.self="closeLightbox">
+      <div v-if="lightbox.show" class="lb"
+        @wheel.prevent="onLbWheel"
+        @mousedown="onLbMouseDown"
+        @mousemove="onLbMouseMove"
+        @mouseup="onLbMouseUp"
+        @mouseleave="onLbMouseUp"
+        @dblclick="onLbDblClick"
+        @click.self="onLbBackdropClick">
         <button class="lb-close" @click="closeLightbox">&times;</button>
-        <button v-if="lightbox.images.length > 1" class="lb-arr lb-arr--left" @click="prevImage" :disabled="lightbox.currentIndex === 0">&lt;</button>
-        <div class="lb-main"><img :src="lightbox.images[lightbox.currentIndex]" @error="onImgError" /></div>
-        <button v-if="lightbox.images.length > 1" class="lb-arr lb-arr--right" @click="nextImage" :disabled="lightbox.currentIndex === lightbox.images.length - 1">&gt;</button>
-        <span class="lb-count">{{ lightbox.currentIndex + 1 }} / {{ lightbox.images.length }}</span>
+        <button v-if="lightbox.images.length > 1" class="lb-arr lb-arr--left"
+          @click="prevImage" :disabled="lightbox.currentIndex === 0">&lt;</button>
+        <div class="lb-main" :style="lbMainStyle">
+          <img :src="lightbox.images[lightbox.currentIndex]"
+            :style="lbImgStyle"
+            @error="onImgError"
+            draggable="false" />
+        </div>
+        <button v-if="lightbox.images.length > 1" class="lb-arr lb-arr--right"
+          @click="nextImage" :disabled="lightbox.currentIndex === lightbox.images.length - 1">&gt;</button>
+        <div class="lb-hud">
+          <span class="lb-count">{{ lightbox.currentIndex + 1 }} / {{ lightbox.images.length }}</span>
+          <button v-if="lbZoom > 1" class="lb-reset" @click="lbResetZoom">Reset zoom</button>
+          <span class="lb-zoom-hint" v-else>Scroll or pinch to zoom</span>
+        </div>
       </div>
     </Transition>
 
@@ -381,17 +399,22 @@
     <Transition name="m">
       <div v-if="confirmDialog.show" class="overlay" @click.self="closeConfirm">
         <div class="modal confirm-modal">
-          <div class="confirm-icon" :class="{ 'confirm-icon--danger': confirmDialog.danger }">
-            <svg v-if="confirmDialog.danger" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <div class="m-head">
+            <div class="confirm-title-row">
+              <div class="confirm-icon-badge" :class="{ 'confirm-icon-badge--danger': confirmDialog.danger }">
+                <svg v-if="confirmDialog.danger" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <h3>{{ confirmDialog.title }}</h3>
+            </div>
+            <button @click="closeConfirm" class="m-x">&times;</button>
           </div>
-          <div class="confirm-body">
-            <h3 class="confirm-title">{{ confirmDialog.title }}</h3>
+          <div class="m-body">
             <p class="confirm-message">{{ confirmDialog.message }}</p>
           </div>
-          <div class="confirm-foot">
+          <div class="m-foot">
             <button @click="closeConfirm" class="btn-flat">Cancel</button>
-            <button @click="doConfirm" class="btn-confirm" :class="{ 'btn-confirm--danger': confirmDialog.danger }">
+            <button @click="doConfirm" class="btn-fill" :class="{ 'btn-fill--danger': confirmDialog.danger }">
               {{ confirmDialog.confirmLabel }}
             </button>
           </div>
@@ -503,6 +526,15 @@ const newArtistUrl = ref('')
 const uploadingWork = ref(null)
 const customImageUrl = ref('')
 const lightbox = ref({ show: false, images: [], currentIndex: 0, code: '' })
+// Zoom state
+const lbZoom = ref(1)
+const lbPanX = ref(0)
+const lbPanY = ref(0)
+const lbDragging = ref(false)
+const lbDragStart = ref({ x: 0, y: 0 })
+const lbPanStart = ref({ x: 0, y: 0 })
+// Pinch state
+let lbPinchDist = null
 const toast = ref({ show: false, message: '', type: 'success' })
 const isPreloading = ref(false)
 const imageDB = ref(null)
@@ -574,6 +606,14 @@ const workSections = computed(() => [
   { key: 'comp', label: 'Compilations', items: filteredCompilations.value }
 ])
 const galleryAllFailed = computed(() => galleryFailed.value.length >= 20)
+const lbImgStyle = computed(() => ({
+  transform: `scale(${lbZoom.value}) translate(${lbPanX.value / lbZoom.value}px, ${lbPanY.value / lbZoom.value}px)`,
+  transition: lbDragging.value ? 'none' : 'transform 0.2s ease',
+  cursor: lbZoom.value > 1 ? (lbDragging.value ? 'grabbing' : 'grab') : 'zoom-in',
+}))
+const lbMainStyle = computed(() => ({
+  overflow: lbZoom.value > 1 ? 'visible' : 'hidden',
+}))
 const pullOpacity = computed(() => Math.min(pullDistance.value / PULL_THRESHOLD, 1))
 const pullRotation = computed(() => isPullRefreshing.value ? 360 : (pullDistance.value / PULL_THRESHOLD) * 180)
 
@@ -860,26 +900,128 @@ function openLightbox(work, startIndex = 0) {
   const imgs = allImgs.map(x => x.url)
   const mappedIndex = startIndex === 0 ? 0 : allImgs.findIndex(x => x.index === startIndex)
   lightbox.value = { show: true, images: imgs, currentIndex: Math.max(0, mappedIndex), code: work.code }
-  document.body.style.overflow = 'hidden'; nextTick(() => setupSwipeGestures())
+  lbResetZoom()
+  document.body.style.overflow = 'hidden'
+  nextTick(() => setupSwipeGestures())
 }
-function closeLightbox() { lightbox.value.show = false; document.body.style.overflow = ''; cleanupSwipeGestures() }
+function closeLightbox() {
+  lightbox.value.show = false
+  document.body.style.overflow = ''
+  lbResetZoom()
+  cleanupSwipeGestures()
+}
+function lbResetZoom() {
+  lbZoom.value = 1; lbPanX.value = 0; lbPanY.value = 0
+}
+
+// ─── Mouse zoom & pan ─────────────────────────────────────────────────────
+function onLbWheel(e) {
+  const delta = e.deltaY < 0 ? 0.15 : -0.15
+  lbZoom.value = Math.min(5, Math.max(1, lbZoom.value + delta))
+  if (lbZoom.value === 1) { lbPanX.value = 0; lbPanY.value = 0 }
+}
+function onLbDblClick(e) {
+  if (e.target.classList.contains('lb') || e.target.classList.contains('lb-main')) { closeLightbox(); return }
+  if (lbZoom.value > 1) { lbResetZoom() } else { lbZoom.value = 2.5 }
+}
+function onLbBackdropClick(e) {
+  if (lbZoom.value > 1) { lbResetZoom() } else { closeLightbox() }
+}
+function onLbMouseDown(e) {
+  if (lbZoom.value <= 1 || e.target.closest('button')) return
+  lbDragging.value = true
+  lbDragStart.value = { x: e.clientX, y: e.clientY }
+  lbPanStart.value = { x: lbPanX.value, y: lbPanY.value }
+}
+function onLbMouseMove(e) {
+  if (!lbDragging.value) return
+  lbPanX.value = lbPanStart.value.x + (e.clientX - lbDragStart.value.x)
+  lbPanY.value = lbPanStart.value.y + (e.clientY - lbDragStart.value.y)
+}
+function onLbMouseUp() { lbDragging.value = false }
+
+// ─── Touch: swipe to navigate + pinch to zoom ─────────────────────────────
 function setupSwipeGestures() {
   const el = document.querySelector('.lb'); if (!el) return
-  lightboxTouchStart = e => { touchStartX.value = e.changedTouches[0].screenX; touchStartY.value = e.changedTouches[0].screenY }
-  lightboxTouchEnd = e => { touchEndX.value = e.changedTouches[0].screenX; touchEndY.value = e.changedTouches[0].screenY; handleSwipe() }
-  el.addEventListener('touchstart', lightboxTouchStart, { passive: true }); el.addEventListener('touchend', lightboxTouchEnd, { passive: true })
+  let pinchStartDist = null
+  let pinchStartZoom = 1
+  let tapTimeout = null
+  let lastTap = 0
+
+  lightboxTouchStart = e => {
+    if (e.touches.length === 2) {
+      // pinch start
+      pinchStartDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      )
+      pinchStartZoom = lbZoom.value
+    } else if (e.touches.length === 1) {
+      touchStartX.value = e.changedTouches[0].screenX
+      touchStartY.value = e.changedTouches[0].screenY
+      if (lbZoom.value > 1) {
+        lbDragging.value = true
+        lbDragStart.value = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+        lbPanStart.value = { x: lbPanX.value, y: lbPanY.value }
+      }
+    }
+  }
+
+  const onTouchMove = e => {
+    if (e.touches.length === 2 && pinchStartDist) {
+      e.preventDefault()
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      )
+      lbZoom.value = Math.min(5, Math.max(1, pinchStartZoom * (dist / pinchStartDist)))
+    } else if (e.touches.length === 1 && lbDragging.value) {
+      lbPanX.value = lbPanStart.value.x + (e.touches[0].clientX - lbDragStart.value.x)
+      lbPanY.value = lbPanStart.value.y + (e.touches[0].clientY - lbDragStart.value.y)
+    }
+  }
+
+  lightboxTouchEnd = e => {
+    if (e.touches.length === 0) pinchStartDist = null
+    lbDragging.value = false
+    if (lbZoom.value > 1) return
+    // double-tap to zoom
+    const now = Date.now()
+    if (now - lastTap < 280) {
+      lbZoom.value = 2.5; lastTap = 0; return
+    }
+    lastTap = now
+    // swipe navigation
+    touchEndX.value = e.changedTouches[0].screenX
+    touchEndY.value = e.changedTouches[0].screenY
+    handleSwipe()
+  }
+
+  el.addEventListener('touchstart', lightboxTouchStart, { passive: true })
+  el.addEventListener('touchmove', onTouchMove, { passive: false })
+  el.addEventListener('touchend', lightboxTouchEnd, { passive: true })
+  el._lbTouchMove = onTouchMove
 }
 function cleanupSwipeGestures() {
   const el = document.querySelector('.lb'); if (!el) return
   if (lightboxTouchStart) el.removeEventListener('touchstart', lightboxTouchStart)
+  if (el._lbTouchMove) el.removeEventListener('touchmove', el._lbTouchMove)
   if (lightboxTouchEnd) el.removeEventListener('touchend', lightboxTouchEnd)
 }
 function handleSwipe() {
   const dx = touchEndX.value - touchStartX.value; const dy = touchEndY.value - touchStartY.value
   if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) dx > 0 ? prevImage() : nextImage()
 }
-function nextImage() { if (lightbox.value.currentIndex < lightbox.value.images.length - 1) lightbox.value.currentIndex++ }
-function prevImage() { if (lightbox.value.currentIndex > 0) lightbox.value.currentIndex-- }
+function nextImage() {
+  if (lightbox.value.currentIndex < lightbox.value.images.length - 1) {
+    lightbox.value.currentIndex++; lbResetZoom()
+  }
+}
+function prevImage() {
+  if (lightbox.value.currentIndex > 0) {
+    lightbox.value.currentIndex--; lbResetZoom()
+  }
+}
 function preloadAllGallery() {
   if (!currentWork.value) return; isPreloading.value = true
   const promises = []
@@ -1588,7 +1730,7 @@ function doConfirm() { confirmDialog.value.onConfirm?.(); closeConfirm() }
 .w-code { font: 600 12px var(--mono); color: var(--ink); display: block; padding-inline: 2px; }
 
 /* ─── Detail ─── */
-.detail { display: grid; grid-template-columns: 1fr 420px; gap: 32px; }
+.detail { display: grid; grid-template-columns: 1fr 500px; gap: 24px; }
 .detail-left { display: flex; flex-direction: column; gap: 12px; }
 .detail-right { display: flex; flex-direction: column; gap: 12px; }
 
@@ -1972,7 +2114,8 @@ function doConfirm() { confirmDialog.value.onConfirm?.(); closeConfirm() }
   align-items: center;
   justify-content: center;
   z-index: 400;
-  touch-action: pan-y pinch-zoom;
+  touch-action: none;
+  user-select: none;
 }
 .lb-close {
   position: fixed;
@@ -1990,19 +2133,30 @@ function doConfirm() { confirmDialog.value.onConfirm?.(); closeConfirm() }
   align-items: center;
   justify-content: center;
   transition: background var(--t);
+  z-index: 1;
 }
 .lb-close:hover { background: rgba(255,255,255,.15); }
 
-.lb-main { max-width: 90%; max-height: 90%; }
+.lb-main {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 90vw;
+  max-height: 90vh;
+}
 .lb-main img {
-  max-width: 100%;
+  max-width: 90vw;
   max-height: 90vh;
   object-fit: contain;
   border-radius: var(--r);
   user-select: none;
   -webkit-user-drag: none;
-  pointer-events: none;
+  display: block;
+  transform-origin: center center;
+  will-change: transform;
 }
+
 .lb-arr {
   position: fixed;
   inset-block-start: 50%;
@@ -2020,24 +2174,46 @@ function doConfirm() { confirmDialog.value.onConfirm?.(); closeConfirm() }
   align-items: center;
   justify-content: center;
   transition: background var(--t);
+  z-index: 1;
 }
 .lb-arr:hover:not(:disabled) { background: rgba(255,255,255,.15); }
 .lb-arr:disabled { opacity: 0.2; cursor: not-allowed; }
 .lb-arr--left  { inset-inline-start: 20px; }
 .lb-arr--right { inset-inline-end: 20px; }
 
-.lb-count {
+.lb-hud {
   position: fixed;
   inset-block-end: 24px;
   inset-inline-start: 50%;
   transform: translateX(-50%);
-  padding: 8px 20px;
-  background: rgba(255,255,255,.08);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0,0,0,.55);
   border: 1px solid rgba(255,255,255,.12);
   border-radius: 20px;
+  padding: 6px 16px;
+  white-space: nowrap;
+}
+.lb-count {
   color: #fff;
   font: 600 13px var(--mono);
 }
+.lb-zoom-hint {
+  color: rgba(255,255,255,.4);
+  font: 400 11px var(--sans);
+}
+.lb-reset {
+  border: none;
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  font: 600 11px var(--sans);
+  padding: 3px 10px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background var(--t);
+}
+.lb-reset:hover { background: rgba(255,255,255,.22); }
 
 /* ─── Toast ─── */
 .toast {
@@ -2100,68 +2276,45 @@ function doConfirm() { confirmDialog.value.onConfirm?.(); closeConfirm() }
 }
 
 /* ─── Confirm dialog ─── */
-.confirm-modal {
-  max-width: 380px;
-  border-radius: calc(var(--r) + 4px);
-  overflow: hidden;
+.confirm-modal { max-width: 400px; }
+.confirm-title-row {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 10px;
 }
-.confirm-icon {
+.confirm-icon-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1.5px solid var(--line2);
+  background: var(--bg);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding-block: 28px 8px;
-  color: var(--ink3);
+  color: var(--ink2);
+  flex-shrink: 0;
 }
-.confirm-icon--danger { color: #c44; }
-.confirm-body {
-  padding: 8px 28px 24px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.confirm-icon-badge--danger {
+  border-color: #c44;
+  background: #fef0f0;
+  color: #c44;
 }
-.confirm-title {
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  color: var(--ink);
+.dark .confirm-icon-badge--danger {
+  background: #2a1010;
+  border-color: #a33;
+  color: #e06060;
 }
 .confirm-message {
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.65;
   color: var(--ink2);
+  margin: 0;
 }
-.confirm-foot {
-  display: flex;
-  gap: 0;
-  border-block-start: 1.5px solid var(--line);
+.btn-fill--danger {
+  background: #c44;
+  border-color: #c44;
 }
-.confirm-foot .btn-flat {
-  border-radius: 0;
-  border: none;
-  border-inline-end: 1.5px solid var(--line);
-  background: var(--surface);
-  flex: 1;
-  padding-block: 14px;
-  font-size: 14px;
-}
-.confirm-foot .btn-flat:hover { background: var(--bg); }
-.btn-confirm {
-  flex: 1;
-  padding-block: 14px;
-  border: none;
-  border-radius: 0;
-  font: 700 14px var(--sans);
-  cursor: pointer;
-  background: var(--ink);
-  color: var(--surface);
-  transition: opacity var(--t);
-}
-.btn-confirm:hover { opacity: 0.85; }
-.btn-confirm--danger { background: #c44; color: #fff; }
-.btn-confirm--danger:hover { opacity: 0.9; }
+.btn-fill--danger:hover { opacity: 0.9; }
 
 /* ─── Vue transition classes (must use :deep() in scoped) ─── */
 :deep(.app-load-leave-active) { transition: opacity 0.25s ease; }
@@ -2217,15 +2370,78 @@ function doConfirm() { confirmDialog.value.onConfirm?.(); closeConfirm() }
 }
 
 /* ─── Responsive ─── */
+
+/* ── Large desktop: detail panel stays side-by-side ── */
 @media (max-width: 1200px) {
   .detail { grid-template-columns: 1fr; }
 }
-@media (min-width: 769px) and (max-width: 1024px) {
-  .search-box input { width: 130px; }
-  .grid-artists { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
-  .grid-works   { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
-  .grid-works--compact { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+
+/* ── Tablet landscape: 1025–1500px (covers MagicPad 2 landscape ~1400px) ── */
+@media (min-width: 1025px) and (max-width: 1500px) {
+  .page { padding-inline: 32px; }
+  .grid-artists { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
+  .grid-works   { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
+  .grid-works--compact { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+  .detail { grid-template-columns: 1fr 480px; gap: 24px; }
+  .gallery { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* ── Tablet portrait: 769–1024px (covers MagicPad 2 portrait ~920px) ── */
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* Bar */
+  .bar { height: 56px; padding-inline: 20px; }
+  .search-box input { width: 180px; font-size: 14px; }
+  .btn-back,
+  .btn-icon,
+  .btn-menu { width: 40px; height: 40px; }
+  .bar-title { font-size: 16px; max-width: 220px; }
+
+  /* Page */
+  .page { padding: 80px 28px 48px; }
+  .group-head { inset-block-start: 56px; }
+  .letter { font-size: 32px; }
+
+  /* Grids — generous cards for touch targets */
+  .grid-artists { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; padding-inline-end: 40px; }
+  .grid-works   { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .grid-works--compact { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+
+  /* Detail — stack on portrait tablet */
+  .detail { grid-template-columns: 1fr; gap: 20px; }
+
+  /* Gallery: 4 columns fits nicely */
+  .gallery { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+
+  /* Actions — bigger touch targets */
+  .act-btn { padding-block: 18px; font-size: 12px; gap: 8px; }
+  .actions-nav { height: 56px; }
+  .nav-btn { height: 56px; width: 64px; }
+
+  /* Alpha rail — slightly bigger */
+  .alpha-rail button { font-size: 10px; padding: 2px 5px; }
+
+  /* Works top */
+  .works-top { gap: 16px; }
+  .btn-add { height: 40px; padding-inline: 20px; font-size: 13px; }
+  .sort-select { height: 40px; font-size: 13px; }
+
+  /* Chips */
+  .chip { font-size: 12px; padding: 5px 14px; }
+
+  /* Link grid: 2 col on tablet portrait */
+  .link-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Modal */
+  .modal { max-width: 500px; }
+
+  /* Bottom sheet pills — bigger tap area */
+  .pill { padding: 10px 20px; font-size: 14px; }
+
+  /* Nav bar badge */
+  .bar-work-badge { display: flex; }
+}
+
+/* ── Mobile landscape & small tablet: ≤768px ── */
 @media (max-width: 768px) {
   .bar { padding-inline: 14px; height: 50px; gap: 8px; }
   .stats { font-size: 12px; }
@@ -2241,6 +2457,8 @@ function doConfirm() { confirmDialog.value.onConfirm?.(); closeConfirm() }
   .alpha-rail button { font-size: 8px; padding: 1px 3px; }
   .bar-work-badge { display: none; }
 }
+
+/* ── Mobile portrait: ≤640px ── */
 @media (max-width: 640px) {
   .stats { display: none; }
   .bar-title { max-width: 120px; }
@@ -2261,12 +2479,32 @@ function doConfirm() { confirmDialog.value.onConfirm?.(); closeConfirm() }
   .bar-artist .breadcrumb-arrow { display: none; }
   .shortcut-hint { display: none; }
 }
+
+/* ── Small phone: ≤360px ── */
 @media (max-width: 360px) {
   .search-box input { width: 70px; font-size: 11px; padding: 6px 24px 6px 26px; }
   .bar-title { max-width: 90px; font-size: 13px; }
   .btn-icon,
   .btn-menu { width: 28px; height: 28px; }
   .bar { padding-inline: 10px; gap: 6px; }
+}
+
+/* ── Tablet-specific touch refinements (pointer: coarse) ── */
+@media (pointer: coarse) and (min-width: 769px) {
+  /* Larger tap targets for all interactive elements */
+  .a-card:hover { transform: none; }
+  .w-card:hover { transform: none; }
+  .thumb:hover { transform: none; }
+  .nav-btn { min-width: 56px; }
+
+  /* Swipe-friendly bottom sheet */
+  .bottom-sheet { padding-block-end: max(48px, env(safe-area-inset-bottom, 48px)); }
+  .pill { min-height: 44px; }
+  .sheet-done { min-height: 52px; }
+
+  /* Lightbox arrows — bigger touch targets */
+  .lb-arr { width: 60px; height: 60px; font-size: 28px; }
+  .lb-close { width: 52px; height: 52px; font-size: 28px; }
 }
 </style>
 
