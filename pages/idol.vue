@@ -377,6 +377,28 @@
       </div>
     </Transition>
 
+    <!-- Confirm Dialog -->
+    <Transition name="m">
+      <div v-if="confirmDialog.show" class="overlay" @click.self="closeConfirm">
+        <div class="modal confirm-modal">
+          <div class="confirm-icon" :class="{ 'confirm-icon--danger': confirmDialog.danger }">
+            <svg v-if="confirmDialog.danger" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <svg v-else width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </div>
+          <div class="confirm-body">
+            <h3 class="confirm-title">{{ confirmDialog.title }}</h3>
+            <p class="confirm-message">{{ confirmDialog.message }}</p>
+          </div>
+          <div class="confirm-foot">
+            <button @click="closeConfirm" class="btn-flat">Cancel</button>
+            <button @click="doConfirm" class="btn-confirm" :class="{ 'btn-confirm--danger': confirmDialog.danger }">
+              {{ confirmDialog.confirmLabel }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
     <!-- Toast -->
     <Transition name="toast">
       <div v-if="toast.show" class="toast" :class="`toast--${toast.type}`">{{ toast.message }}</div>
@@ -873,9 +895,17 @@ function openExternalLink(code, type) {
   window.open(urls[type] || urls.njav, '_blank', 'noopener,noreferrer')
 }
 function clearViewHistory() {
-  if (!confirm('Clear all viewing history?')) return
-  viewedArtists.value = []; viewedWorks.value = []
-  localStorage.removeItem('viewedArtists'); localStorage.removeItem('viewedWorks'); showToast('History cleared')
+  showConfirm({
+    title: 'Clear history',
+    message: 'This will remove all viewed markers for artists and works. Your data stays intact.',
+    confirmLabel: 'Clear history',
+    danger: false,
+    onConfirm: () => {
+      viewedArtists.value = []; viewedWorks.value = []
+      localStorage.removeItem('viewedArtists'); localStorage.removeItem('viewedWorks')
+      showToast('History cleared')
+    }
+  })
 }
 function showToast(msg, type = 'success') {
   toast.value = { show: true, message: msg, type }; setTimeout(() => toast.value.show = false, 2500)
@@ -910,16 +940,31 @@ function importData(event) {
   } catch { showToast('Import failed', 'error') }
 }
 function hardRefresh() {
-  if (!confirm('Reset everything? Cannot be undone.')) return
-  ;['artists', 'viewedArtists', 'viewedWorks', 'artistSortBy', 'customImages'].forEach(k => localStorage.removeItem(k))
-  const p = imageDB.value ? imageDB.value.clear() : Promise.resolve()
-  p.then(() => {
-    artists.value = normalizeArtists(JSON.parse(JSON.stringify(DEFAULT_ARTISTS)))
-    currentView.value = 'artists'; activeTab.value = ''; customImages.value = {}
-    viewedArtists.value = []; viewedWorks.value = []; artistSortBy.value = 'nameAsc'
-    localStorage.setItem('artists', JSON.stringify(artists.value)); showToast('Reset complete')
+  showConfirm({
+    title: 'Reset everything',
+    message: 'All artists, works, images and history will be permanently deleted. This cannot be undone.',
+    confirmLabel: 'Reset all',
+    danger: true,
+    onConfirm: () => {
+      ;['artists', 'viewedArtists', 'viewedWorks', 'artistSortBy', 'customImages'].forEach(k => localStorage.removeItem(k))
+      const p = imageDB.value ? imageDB.value.clear() : Promise.resolve()
+      p.then(() => {
+        artists.value = normalizeArtists(JSON.parse(JSON.stringify(DEFAULT_ARTISTS)))
+        currentView.value = 'artists'; activeTab.value = ''; customImages.value = {}
+        viewedArtists.value = []; viewedWorks.value = []; artistSortBy.value = 'nameAsc'
+        localStorage.setItem('artists', JSON.stringify(artists.value)); showToast('Reset complete')
+      })
+    }
   })
 }
+
+// ─── Confirm dialog ───────────────────────────────────────────────────────
+const confirmDialog = ref({ show: false, title: '', message: '', confirmLabel: '', danger: false, onConfirm: null })
+function showConfirm({ title, message, confirmLabel, danger, onConfirm }) {
+  confirmDialog.value = { show: true, title, message, confirmLabel, danger, onConfirm }
+}
+function closeConfirm() { confirmDialog.value.show = false }
+function doConfirm() { confirmDialog.value.onConfirm?.(); closeConfirm() }
 </script>
 
 <style scoped>
@@ -2053,6 +2098,70 @@ function hardRefresh() {
   color: var(--ink2);
   margin-inline-end: 4px;
 }
+
+/* ─── Confirm dialog ─── */
+.confirm-modal {
+  max-width: 380px;
+  border-radius: calc(var(--r) + 4px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.confirm-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-block: 28px 8px;
+  color: var(--ink3);
+}
+.confirm-icon--danger { color: #c44; }
+.confirm-body {
+  padding: 8px 28px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.confirm-title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--ink);
+}
+.confirm-message {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink2);
+}
+.confirm-foot {
+  display: flex;
+  gap: 0;
+  border-block-start: 1.5px solid var(--line);
+}
+.confirm-foot .btn-flat {
+  border-radius: 0;
+  border: none;
+  border-inline-end: 1.5px solid var(--line);
+  background: var(--surface);
+  flex: 1;
+  padding-block: 14px;
+  font-size: 14px;
+}
+.confirm-foot .btn-flat:hover { background: var(--bg); }
+.btn-confirm {
+  flex: 1;
+  padding-block: 14px;
+  border: none;
+  border-radius: 0;
+  font: 700 14px var(--sans);
+  cursor: pointer;
+  background: var(--ink);
+  color: var(--surface);
+  transition: opacity var(--t);
+}
+.btn-confirm:hover { opacity: 0.85; }
+.btn-confirm--danger { background: #c44; color: #fff; }
+.btn-confirm--danger:hover { opacity: 0.9; }
 
 /* ─── Vue transition classes (must use :deep() in scoped) ─── */
 :deep(.app-load-leave-active) { transition: opacity 0.25s ease; }

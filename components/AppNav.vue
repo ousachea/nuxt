@@ -1,53 +1,66 @@
 <template>
-    <!-- ── Desktop: floating pill ── -->
+    <!-- ── Desktop: floating hover-expand pill ── -->
     <nav class="nav-desk">
-        <div class="pill" v-click-outside="closeDropdown">
+        <div class="pill-wrap" v-click-outside="closeDropdown">
+            <div class="pill" :class="{ expanded: isExpanded }" @mouseenter="isExpanded = true"
+                @mouseleave="isExpanded = false">
 
-            <NuxtLink to="/" class="logo">
-                <div class="logo-sq">
-                    <svg viewBox="0 0 14 14" fill="none">
-                        <rect x="2" y="2" width="4" height="4" rx="1" fill="white" opacity="0.9" />
-                        <rect x="8" y="2" width="4" height="4" rx="1" fill="white" opacity="0.6" />
-                        <rect x="2" y="8" width="4" height="4" rx="1" fill="white" opacity="0.6" />
-                        <rect x="8" y="8" width="4" height="4" rx="1" fill="white" opacity="0.3" />
-                    </svg>
-                </div>
-                <span class="logo-name">MyApp</span>
-            </NuxtLink>
-
-            <div class="divider" />
-
-            <!-- Primary links -->
-            <div class="links">
-                <NuxtLink v-for="r in primaryRoutes" :key="r.path" :to="r.path" class="d-item"
-                    :class="{ active: isActive(r.path) }">
-                    <span class="d-label">{{ routeLabel(r.path) }}</span>
-                    <span v-if="isActive(r.path)" class="d-pip" />
+                <!-- Logo icon — always visible -->
+                <NuxtLink to="/" class="logo-btn">
+                    <div class="logo-sq">
+                        <svg viewBox="0 0 14 14" fill="none">
+                            <rect x="2" y="2" width="4" height="4" rx="1" fill="white" opacity="0.9" />
+                            <rect x="8" y="2" width="4" height="4" rx="1" fill="white" opacity="0.6" />
+                            <rect x="2" y="8" width="4" height="4" rx="1" fill="white" opacity="0.6" />
+                            <rect x="8" y="8" width="4" height="4" rx="1" fill="white" opacity="0.3" />
+                        </svg>
+                    </div>
                 </NuxtLink>
 
-                <!-- More dropdown -->
-                <div v-if="overflowRoutes.length" class="more-wrap">
-                    <button class="more-btn" :class="{ open: dropOpen, 'has-active': overflowHasActive }"
-                        @click="dropOpen = !dropOpen">
-                        More
-                        <svg viewBox="0 0 12 12" fill="none" width="11" height="11">
-                            <path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
-                                stroke-linejoin="round" />
-                        </svg>
-                        <span v-if="overflowHasActive" class="more-pip" />
-                    </button>
+                <!-- Expandable content -->
+                <div class="pill-content" :class="{ visible: isExpanded }">
+                    <span class="logo-name">MyApp</span>
+                    <div class="divider" />
 
-                    <Transition name="drop">
-                        <div v-if="dropOpen" class="dropdown">
-                            <NuxtLink v-for="r in overflowRoutes" :key="r.path" :to="r.path" class="drop-item"
-                                :class="{ active: isActive(r.path) }" @click="dropOpen = false">
-                                <span>{{ routeLabel(r.path) }}</span>
-                                <span class="drop-path">{{ r.path }}</span>
-                            </NuxtLink>
+                    <!-- Primary links -->
+                    <div class="links">
+                        <NuxtLink v-for="r in primaryRoutes" :key="r.path" :to="r.path" class="d-item"
+                            :class="{ active: isActive(r.path) }">
+                            <span class="d-label">{{ routeLabel(r.path) }}</span>
+                            <span v-if="isActive(r.path)" class="d-pip" />
+                        </NuxtLink>
+
+                        <!-- More dropdown -->
+                        <div v-if="overflowRoutes.length" class="more-wrap">
+                            <button class="more-btn" :class="{ open: dropOpen, 'has-active': overflowHasActive }"
+                                @click.stop="dropOpen = !dropOpen">
+                                More
+                                <svg viewBox="0 0 12 12" fill="none" width="11" height="11">
+                                    <path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5"
+                                        stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                                <span v-if="overflowHasActive" class="more-pip" />
+                            </button>
+
+                            <Transition name="drop">
+                                <div v-if="dropOpen" class="dropdown">
+                                    <NuxtLink v-for="r in overflowRoutes" :key="r.path" :to="r.path"
+                                        class="drop-item" :class="{ active: isActive(r.path) }"
+                                        @click="dropOpen = false">
+                                        <span>{{ routeLabel(r.path) }}</span>
+                                        <span class="drop-path">{{ r.path }}</span>
+                                    </NuxtLink>
+                                </div>
+                            </Transition>
                         </div>
-                    </Transition>
+                    </div>
                 </div>
             </div>
+
+            <!-- Hover hint tooltip (only when collapsed) -->
+            <Transition name="hint">
+                <div v-if="!isExpanded" class="hover-hint">Navigation</div>
+            </Transition>
         </div>
     </nav>
 
@@ -105,6 +118,11 @@
 const router = useRouter()
 const route = useRoute()
 
+// ── State ─────────────────────────────────────────────────────────────────
+const isExpanded = ref(false)
+const dropOpen = ref(false)
+const sheetOpen = ref(false)
+
 // ── Route list ──────────────────────────────────────────────────────────────
 const allRoutes = computed(() =>
     router.getRoutes().filter(r =>
@@ -132,6 +150,17 @@ const routeLabel = (path: string) => {
     return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
+const closeDropdown = () => {
+    dropOpen.value = false
+}
+
+// Close on route change
+watch(() => route.path, () => {
+    sheetOpen.value = false
+    dropOpen.value = false
+    isExpanded.value = false
+})
+
 // ── Icons ───────────────────────────────────────────────────────────────────
 const icons: Record<string, string> = {
     dashboard: '<path d="M3 9l4-4 3 3 4-5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>',
@@ -147,32 +176,23 @@ const icons: Record<string, string> = {
     about: '<circle cx="8" cy="8" r="5.5" stroke-width="1.5"/><path d="M8 7v5M8 5.5v.5" stroke-linecap="round" stroke-width="1.5"/>',
     home: '<path d="M2.5 8.5L8 3l5.5 5.5M4 7.5V13h3v-3h2v3h3V7.5" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>',
 }
+
 const routeIcon = (path: string) =>
     icons[path.replace('/', '').toLowerCase()] ??
     '<circle cx="8" cy="8" r="5" stroke-width="1.5"/>'
-
-// ── Dropdown / sheet state ───────────────────────────────────────────────────
-const dropOpen = ref(false)
-const sheetOpen = ref(false)
-
-const closeDropdown = () => { dropOpen.value = false }
-
-// Close sheet on route change
-watch(() => route.path, () => { sheetOpen.value = false; dropOpen.value = false })
 </script>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap');
 
 /* ════════════════════════════════
-   DESKTOP
+   DESKTOP — floating pill
    ════════════════════════════════ */
 .nav-desk {
     display: flex;
     position: fixed;
     bottom: 1.25rem;
-    left: 50%;
-    transform: translateX(-50%);
+    right: 1.25rem;
     z-index: 100;
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
 }
@@ -181,48 +201,93 @@ watch(() => route.path, () => { sheetOpen.value = false; dropOpen.value = false 
     display: none;
 }
 
+/* Wrapper holds pill + hint tooltip */
+.pill-wrap {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+/* ── Pill shell ── */
 .pill {
     display: flex;
+    flex-direction: row-reverse;
     align-items: center;
-    gap: 2px;
-    padding: 5px 7px;
+    gap: 0;
+    height: 44px;
+    padding: 4px;
     background: #fff;
     border: 0.5px solid rgba(0, 0, 0, 0.10);
-    border-radius: 16px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.10),
+    border-radius: 22px;
+    box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.04),
+        0 8px 24px rgba(0, 0, 0, 0.10),
         inset 0 0.5px 0 rgba(255, 255, 255, 0.9);
     white-space: nowrap;
+    overflow: hidden;
+    width: 44px;
+    transition:
+        width 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+        padding 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+        box-shadow 0.18s ease;
+    cursor: default;
 }
 
-/* Logo */
-.logo {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 4px 8px 4px 5px;
-    border-radius: 10px;
-    text-decoration: none;
-    transition: background 0.12s;
+.pill.expanded {
+    width: var(--pill-expanded-width, 540px);
+    padding: 4px 7px;
+    box-shadow:
+        0 2px 6px rgba(0, 0, 0, 0.06),
+        0 12px 32px rgba(0, 0, 0, 0.13),
+        inset 0 0.5px 0 rgba(255, 255, 255, 0.9);
 }
 
-.logo:hover {
-    background: #f5f5f7;
-}
-
-.logo-sq {
-    width: 22px;
-    height: 22px;
-    border-radius: 5px;
-    background: #7c6bff;
+/* ── Logo button (always visible) ── */
+.logo-btn {
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    text-decoration: none;
+}
+
+.logo-sq {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    border-radius: 50%;
+    background: #7c6bff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-radius 0.2s ease;
+}
+
+.pill.expanded .logo-sq {
+    border-radius: 50%;
 }
 
 .logo-sq svg {
-    width: 11px;
-    height: 11px;
+    width: 14px;
+    height: 14px;
+}
+
+/* ── Expandable content (fades in) ── */
+.pill-content {
+    display: flex;
+    align-items: center;
+    flex-direction: row-reverse;
+    gap: 2px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.16s 0.10s ease;
+    /* small delay so it fades in after pill opens */
+}
+
+.pill-content.visible {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .logo-name {
@@ -230,6 +295,8 @@ watch(() => route.path, () => { sheetOpen.value = false; dropOpen.value = false 
     font-weight: 600;
     color: #111;
     letter-spacing: -0.01em;
+    padding: 0 7px 0 8px;
+    flex-shrink: 0;
 }
 
 .divider {
@@ -240,7 +307,7 @@ watch(() => route.path, () => { sheetOpen.value = false; dropOpen.value = false 
     flex-shrink: 0;
 }
 
-/* Links */
+/* ── Nav links ── */
 .links {
     display: flex;
     align-items: center;
@@ -290,7 +357,7 @@ watch(() => route.path, () => { sheetOpen.value = false; dropOpen.value = false 
     background: #7c6bff;
 }
 
-/* More button */
+/* ── More button ── */
 .more-wrap {
     position: relative;
 }
@@ -332,7 +399,7 @@ watch(() => route.path, () => { sheetOpen.value = false; dropOpen.value = false 
     background: #7c6bff;
 }
 
-/* Dropdown */
+/* ── Dropdown ── */
 .dropdown {
     position: absolute;
     bottom: calc(100% + 8px);
@@ -379,17 +446,24 @@ watch(() => route.path, () => { sheetOpen.value = false; dropOpen.value = false 
     color: rgba(124, 107, 255, 0.45);
 }
 
-kbd {
-    font-family: inherit;
-    font-size: 10px;
-    color: #ccc;
-    border: 0.5px solid rgba(0, 0, 0, 0.10);
-    border-radius: 4px;
-    padding: 1px 5px;
-    background: #fff;
+/* ── Hover hint tooltip ── */
+.hover-hint {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    right: 0;
+    background: rgba(0, 0, 0, 0.68);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 500;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    border-radius: 7px;
+    padding: 4px 10px;
+    white-space: nowrap;
+    pointer-events: none;
+    transition: opacity 0.15s 0.6s ease;
 }
 
-/* Dropdown transition */
+/* ── Transitions ── */
 .drop-enter-active,
 .drop-leave-active {
     transition: opacity 0.15s, transform 0.15s;
@@ -399,6 +473,19 @@ kbd {
 .drop-leave-to {
     opacity: 0;
     transform: translateY(6px);
+}
+
+.hint-enter-active {
+    transition: opacity 0.15s 0.8s ease;
+}
+
+.hint-leave-active {
+    transition: opacity 0.1s ease;
+}
+
+.hint-enter-from,
+.hint-leave-to {
+    opacity: 0;
 }
 
 /* ════════════════════════════════
@@ -515,7 +602,7 @@ kbd {
 }
 
 /* ════════════════════════════════
-   MOBILE SHEET (teleported to body)
+   MOBILE SHEET
    ════════════════════════════════ */
 .sheet-overlay {
     position: fixed;
@@ -626,7 +713,7 @@ kbd {
 
 .sheet-enter-active,
 .sheet-leave-active {
-    transition: transform 0.25s cubic-bezier(.32, 1, .22, 1);
+    transition: transform 0.25s cubic-bezier(0.32, 1, 0.22, 1);
 }
 
 .sheet-enter-from,
