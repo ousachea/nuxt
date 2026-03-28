@@ -950,7 +950,7 @@ function hardRefresh() {
 }
 </script>
 
-<style>
+<style scoped>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -1051,7 +1051,7 @@ html, body { font-family: var(--sans); background: var(--bg); color: var(--ink);
 .letter { font-size: 28px; font-weight: 700; letter-spacing: -1.5px; line-height: 1; }
 .group-n { font-size: 13px; color: var(--ink3); font-weight: 600; }
 /* Padding-right accounts for alpha rail width so last column isn't clipped */
-.grid-artists { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; padding-right: 36px; }
+.grid-artists { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; padding-right: 36px; }
 
 .a-card { position: relative; cursor: pointer; border-radius: var(--r); overflow: hidden; transition: opacity var(--t), transform var(--t); }
 .a-card:hover { transform: translateY(-2px); }

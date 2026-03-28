@@ -98,7 +98,7 @@ const carriers = {
     prefixes: ['10','15','16','69','70','81','86','87','93','96','98'],
   },
   Metfone: {
-    color: '#3B82F6',
+    color: 'red',
     prefixes: ['88','97'],
   },
 }

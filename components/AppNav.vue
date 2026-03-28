@@ -126,7 +126,7 @@ const allRoutes = computed(() =>
     )
 )
 
-const DESK_LIMIT = 5
+const DESK_LIMIT = 10
 const MOB_LIMIT = 4
 
 const primaryRoutes = computed(() => allRoutes.value.slice(0, DESK_LIMIT))
