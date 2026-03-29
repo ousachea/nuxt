@@ -11,6 +11,13 @@ export const DEFAULT_ARTISTS = [
       compilations: [''],
       mainWorks: ['___',]
     },
+     {
+      name: 'Shiiba Mikuru',
+      cover: '',
+      url: '',  // Custom cover
+      compilations: [''],
+      mainWorks: ['VEMA-241','SMOK-028','SUKE-043']
+    },
     {
       name: 'Rui Shido 紫堂るい',
       cover: '',
@@ -204,12 +211,12 @@ export const DEFAULT_ARTISTS = [
     {
       name: 'Aika Yumeno', cover: '',
       url: '',  // Custom cover
-      compilations: [''], mainWorks: ['SNIS-413', 'SNIS-477', 'SNIS-659', 'SONE-874', 'SSNI-304']
+      compilations: [''], mainWorks: ['SNIS-413', 'SNIS-477', 'SNIS-659', 'SONE-874', 'SSNI-304','SNOS-159']
     },
     {
       name: 'Aiko Kimura', cover: '',
       url: '',  // Custom cover
-      compilations: [''], mainWorks: ['SONE-828', 'SONE-866', 'SNOS-066', 'SNOS-041', 'SIVR-458', 'SONE-788', 'SONE-783']
+      compilations: [''], mainWorks: ['SONE-828', 'SONE-866', 'SNOS-066', 'SNOS-041', 'SIVR-458', 'SONE-788', 'SONE-783','SNOS-132']
     },
     {
       name: 'Anna Morikawa', cover: '',
@@ -241,7 +248,7 @@ export const DEFAULT_ARTISTS = [
     {
       name: 'Collection', cover: '',
       url: '',  // Custom cover
-      compilations: [''], mainWorks: ['LUXU-1631','SGK-117','EVA-178','GANA-3003','SIRO-5232','ORECO-907','MAAN-1022','NTK-825','DANDY-923','EBOD-911','sone-306','DOCD-008','300MAAN-546','300MIUM-527','LUXU-1814','LUXU-1478','LUXU-1041','259LUXU-1511', 'LUXU-1621','LUXU-950','LUXU-1561','259LUXU-1518', '259LUXU-1571', '259LUXU-1610', '259LUXU-1618', '259LUXU-1621', '259LUXU-1631', '259LUXU-688', '259LUXU-743', 'ADN-630', 'ARA-412', 'CLUB-855', 'DDHP-044', 'FC2-PPV-2864495', 'GANA-2858', 'JUFE-028', 'JUL-872', 'KTB-018', 'MIUM-681', 'MIUM-742', 'MIUM-811', 'NTK-391', 'ORECS-132', 'SSNI-362', 'SUKE-043', 'SUKE-053', 'TOUKA-01',]
+      compilations: [''], mainWorks: ['326FCT-197','300MIUM-546','300MIUM-574','300MIUM-609','300MIUM-1222','300MIUM-1210','300MIUM-1211','300MIUM-1317','300MIUM-1202','300MIUM-786','300MIUM-1219','300MIUM-810','300MIUM-1001','300MIUM-1141','300MIUM-801','300MIUM-778','300MIUM-783','300MIUM-811','300MIUM-908','300MIUM-886','MIDA-520','SSIS-658','JUFD-948','MMKZ-162','HTHD-229','LUXU-1631','SGK-117','EVA-178','GANA-3003','SIRO-5232','ORECO-907','MAAN-1022','NTK-825','DANDY-923','EBOD-911','sone-306','DOCD-008','300MAAN-546','300MIUM-527','LUXU-1814','LUXU-1478','LUXU-1041','259LUXU-1511', 'LUXU-1621','LUXU-950','LUXU-1561','259LUXU-1518', '259LUXU-1571', '259LUXU-1610', '259LUXU-1618', '259LUXU-1621', '259LUXU-1631', '259LUXU-688', '259LUXU-743', 'ADN-630', 'ARA-412', 'CLUB-855', 'DDHP-044', 'FC2-PPV-2864495', 'GANA-2858', 'JUFE-028', 'JUL-872', 'KTB-018', 'MIUM-681', 'MIUM-742', 'MIUM-811', 'NTK-391', 'ORECS-132', 'SSNI-362', 'SUKE-043', 'SUKE-053', 'TOUKA-01',]
     },
     {
       name: 'Ema Yuina', cover: '',
