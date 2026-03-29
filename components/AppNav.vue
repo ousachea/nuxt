@@ -122,18 +122,15 @@ const pillRef = ref<HTMLElement | null>(null)
 const pillContentRef = ref<HTMLElement | null>(null)
 const expandedWidth = ref(44)
 
-// Measure the natural scrollWidth of the content + logo (36px) + padding (14px each side) + divider gap
 const measureWidth = () => {
     nextTick(() => {
         if (!pillContentRef.value) return
-        // Temporarily make content visible for measurement
         const el = pillContentRef.value
         el.style.opacity = '1'
         el.style.pointerEvents = 'none'
         const contentW = el.scrollWidth
         el.style.opacity = ''
         el.style.pointerEvents = ''
-        // 36 (logo) + 4 (logo padding) + 7 (right padding) + 7 (left padding) + content
         expandedWidth.value = 36 + 4 + 7 + 7 + contentW
     })
 }
@@ -194,7 +191,6 @@ const closeDropdown = () => {
     dropOpen.value = false
 }
 
-// Close on route change
 watch(() => route.path, () => {
     if (closeTimer) { clearTimeout(closeTimer); closeTimer = null }
     sheetOpen.value = false
@@ -202,7 +198,6 @@ watch(() => route.path, () => {
     isExpanded.value = false
 })
 
-// Re-measure when routes are available / change
 watch(allRoutes, measureWidth, { immediate: false })
 onMounted(measureWidth)
 
@@ -246,7 +241,6 @@ const routeIcon = (path: string) =>
     display: none;
 }
 
-/* Wrapper holds pill + hint tooltip — padding creates invisible hover buffer */
 .pill-wrap {
     position: relative;
     display: flex;
@@ -291,7 +285,7 @@ const routeIcon = (path: string) =>
         inset 0 0.5px 0 rgba(255, 255, 255, 0.9);
 }
 
-/* ── Logo button (always visible, last in DOM = rightmost) ── */
+/* ── Logo button ── */
 .logo-btn {
     display: flex;
     align-items: center;
@@ -338,7 +332,7 @@ const routeIcon = (path: string) =>
     }
 }
 
-/* ── Expandable content (fades in) ── */
+/* ── Expandable content ── */
 .pill-content {
     display: flex;
     align-items: center;
@@ -477,13 +471,12 @@ const routeIcon = (path: string) =>
     border-radius: 12px;
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
     padding: 4px;
-    padding-bottom: 4px;
     margin-bottom: 8px;
     min-width: 160px;
     z-index: 10;
 }
 
-/* Invisible bridge to prevent hover gap between dropdown and pill */
+/* Invisible bridge to close hover gap between dropdown and pill */
 .dropdown::after {
     content: '';
     position: absolute;
