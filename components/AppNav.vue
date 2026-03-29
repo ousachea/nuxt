@@ -157,16 +157,19 @@ const onLeave = () => {
     closeTimer = setTimeout(() => {
         isExpanded.value = false
         dropOpen.value = false
-    }, 320)
+    }, 450)
 }
 
 // ── Route list ──────────────────────────────────────────────────────────────
+const hiddenRoutes = ['/idol']
+
 const allRoutes = computed(() =>
     router.getRoutes().filter(r =>
         r.path !== '/' &&
         !r.path.startsWith('/__') &&
         !/[:[*]/.test(r.path) &&
-        r.path.split('/').filter(Boolean).length === 1
+        r.path.split('/').filter(Boolean).length === 1 &&
+        !hiddenRoutes.includes(r.path)
     )
 )
 
@@ -249,8 +252,8 @@ const routeIcon = (path: string) =>
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    padding: 12px;
-    margin: -12px;
+    padding: 16px;
+    margin: -16px;
 }
 
 /* ── Pill shell ── */
@@ -311,15 +314,28 @@ const routeIcon = (path: string) =>
     align-items: center;
     justify-content: center;
     transition: border-radius 0.2s ease;
+    animation: breathe 3s ease-in-out infinite;
 }
 
 .pill.expanded .logo-sq {
     border-radius: 50%;
+    animation: none;
 }
 
 .logo-sq svg {
     width: 14px;
     height: 14px;
+}
+
+@keyframes breathe {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(124, 107, 255, 0.35);
+    }
+    50% {
+        transform: scale(1.08);
+        box-shadow: 0 0 12px 4px rgba(124, 107, 255, 0.18);
+    }
 }
 
 /* ── Expandable content (fades in) ── */
@@ -454,15 +470,27 @@ const routeIcon = (path: string) =>
 /* ── Dropdown ── */
 .dropdown {
     position: absolute;
-    bottom: calc(100% + 8px);
+    bottom: 100%;
     right: 0;
     background: #fff;
     border: 0.5px solid rgba(0, 0, 0, 0.10);
     border-radius: 12px;
     box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
     padding: 4px;
+    padding-bottom: 4px;
+    margin-bottom: 8px;
     min-width: 160px;
     z-index: 10;
+}
+
+/* Invisible bridge to prevent hover gap between dropdown and pill */
+.dropdown::after {
+    content: '';
+    position: absolute;
+    bottom: -12px;
+    left: 0;
+    right: 0;
+    height: 12px;
 }
 
 .drop-item {
