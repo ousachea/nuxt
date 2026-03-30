@@ -56,11 +56,13 @@
                         <span class="gold-price-unit">/ troy oz</span>
                     </div>
 
-                    <!-- Per-unit strip -->
-                    <div v-if="goldPrice" class="price-strip">
-                        <div v-for="u in priceUnits" :key="u.key" class="strip-item">
-                            <span class="strip-label">{{ t[u.key] || u.label }}</span>
-                            <span class="strip-val">${{ u.price.toFixed(2) }}</span>
+                    <!-- Per-unit strip — scrollable on mobile -->
+                    <div v-if="goldPrice" class="price-strip-wrap">
+                        <div class="price-strip">
+                            <div v-for="u in priceUnits" :key="u.key" class="strip-item">
+                                <span class="strip-label">{{ t[u.key] || u.label }}</span>
+                                <span class="strip-val">${{ u.price.toFixed(2) }}</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -94,7 +96,8 @@
                         <button v-if="customApiUrl" class="clear-btn" @click="customApiUrl = ''; save()">✕</button>
                     </div>
                     <p class="api-hint">Live prices via <strong>gold-api.com</strong> (free, no key) · Optional: add a
-                        <a href="https://www.goldapi.io/" target="_blank">goldapi.io</a> key as fallback</p>
+                        <a href="https://www.goldapi.io/" target="_blank">goldapi.io</a> key as fallback
+                    </p>
                 </div>
 
                 <!-- Custom Price Panel -->
@@ -223,7 +226,8 @@
                                 </div>
                                 <div class="pcard-row">
                                     <span>{{ t.current }}</span>
-                                    <span class="current-val" :class="gainClass(p)">${{ currentValue(p).toFixed(2) }}</span>
+                                    <span class="current-val" :class="gainClass(p)">${{ currentValue(p).toFixed(2)
+                                        }}</span>
                                 </div>
                                 <div class="pcard-row highlight" :class="gainClass(p)">
                                     <span>{{ t.gainLoss }}</span>
@@ -526,7 +530,6 @@ async function fetchPrice() {
     let ok = false
     const errors = []
 
-    // 1. gold-api.com — free, no key, CORS enabled, no rate limit
     if (!ok) {
         try {
             const r = await fetch('https://api.gold-api.com/price/XAU', { mode: 'cors' })
@@ -543,7 +546,6 @@ async function fetchPrice() {
         }
     }
 
-    // 2. goldapi.io — requires user-supplied API key
     if (!ok && customApiUrl.value?.trim()) {
         try {
             const r = await fetch('https://www.goldapi.io/api/XAU/USD', {
@@ -634,7 +636,6 @@ function importCSV(e) {
             const lines = text.trim().split('\n').map(l => l.trim()).filter(Boolean)
             if (lines.length < 2) { flash('CSV is empty or has no data rows', 'error'); return }
 
-            // Parse header to find column indices
             const hdr = lines[0].split(',').map(h => h.trim().toLowerCase())
             const wi = hdr.indexOf('weight')
             const ui = hdr.indexOf('unit')
@@ -670,7 +671,6 @@ function importCSV(e) {
         }
     }
     reader.readAsText(file)
-    // Reset input so the same file can be re-imported
     e.target.value = ''
 }
 
@@ -750,11 +750,12 @@ onBeforeUnmount(() => {
     --radius: 14px;
     --font-head: 'Plus Jakarta Sans', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-
-    /* ── Primary button tokens ── */
     --btn-primary-bg: #f5c842;
     --btn-primary-text: #1a1400;
     --btn-primary-hover: #ffd94a;
+
+    /* Mobile touch target minimum */
+    --touch-min: 44px;
 }
 
 .app.dark {
@@ -784,8 +785,6 @@ onBeforeUnmount(() => {
     --text-2: #52504a;
     --text-3: #888077;
     --gold-glow: rgba(200, 150, 0, 0.1);
-
-    /* ── Light-mode buttons: darker amber for contrast ── */
     --btn-primary-bg: #b8860b;
     --btn-primary-text: #ffffff;
     --btn-primary-hover: #d49a0e;
@@ -875,6 +874,7 @@ body {
     z-index: 100;
     background: rgba(10, 10, 15, 0.85);
     backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid var(--border);
 }
 
@@ -885,55 +885,76 @@ body {
 .header-inner {
     max-width: 900px;
     margin: 0 auto;
-    padding: 16px 20px;
+    /* Vertical padding scales down on small screens */
+    padding: 12px 16px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
 }
 
 .logo {
     display: flex;
-    gap: 12px;
+    gap: 10px;
     align-items: center;
+    min-width: 0;
+    /* allow text truncation */
 }
 
 .logo-icon {
-    font-size: 28px;
+    font-size: 24px;
     color: var(--gold);
     line-height: 1;
+    flex-shrink: 0;
+}
+
+.logo>div {
+    min-width: 0;
 }
 
 .logo-title {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 800;
     letter-spacing: -0.3px;
     line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .logo-sub {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-2);
     font-family: var(--font-mono);
     letter-spacing: 0.02em;
-    margin-top: 2px;
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .header-controls {
     display: flex;
-    gap: 8px;
+    gap: 6px;
+    flex-shrink: 0;
 }
 
 .ctrl-btn {
     background: var(--surface2);
     border: 1px solid var(--border);
     color: var(--text);
-    padding: 8px 14px;
+    padding: 0 14px;
     border-radius: 8px;
     font-size: 14px;
     font-family: var(--font-head);
     cursor: pointer;
     transition: all 0.2s;
-    min-height: 38px;
+    /* Guaranteed touch target */
+    min-height: var(--touch-min);
+    min-width: var(--touch-min);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .ctrl-btn:hover {
@@ -947,7 +968,7 @@ body {
 
 .offline-bar {
     text-align: center;
-    padding: 8px;
+    padding: 8px 16px;
     font-size: 13px;
     background: rgba(245, 200, 66, 0.15);
     color: var(--gold);
@@ -962,7 +983,7 @@ body {
     z-index: 1;
     max-width: 900px;
     margin: 0 auto;
-    padding: 24px 16px 48px;
+    padding: 16px 12px 56px;
 }
 
 /* ── Price Hero ── */
@@ -970,8 +991,8 @@ body {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 28px;
-    margin-bottom: 20px;
+    padding: 20px 16px;
+    margin-bottom: 16px;
     position: relative;
     overflow: hidden;
 }
@@ -989,12 +1010,12 @@ body {
 .price-tabs {
     display: flex;
     gap: 6px;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
 }
 
 .ptab {
     flex: 1;
-    padding: 10px;
+    padding: 0 10px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--surface2);
@@ -1004,25 +1025,29 @@ body {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    min-height: 40px;
+    min-height: var(--touch-min);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .ptab.active {
     background: var(--gold-glow);
     border-color: var(--border-hi);
     color: var(--gold);
-    font-weight: 500;
 }
 
 .gold-display {
-    margin-bottom: 20px;
+    margin-bottom: 16px;
 }
 
 .gold-meta {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+    gap: 4px;
 }
 
 .metal-label {
@@ -1033,7 +1058,7 @@ body {
 }
 
 .update-time {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-3);
     font-family: var(--font-mono);
 }
@@ -1042,12 +1067,13 @@ body {
     display: flex;
     align-items: baseline;
     gap: 8px;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
     flex-wrap: wrap;
 }
 
 .gold-price-value {
-    font-size: clamp(36px, 8vw, 68px);
+    /* Fluid font: 36px → 68px */
+    font-size: clamp(36px, 10vw, 68px);
     font-weight: 800;
     color: var(--gold);
     line-height: 1;
@@ -1056,21 +1082,29 @@ body {
 }
 
 .gold-price-unit {
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text-3);
     font-family: var(--font-mono);
 }
 
-.price-strip {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+/* Horizontally scrollable strip on mobile */
+.price-strip-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    margin: 0 -4px;
+    padding: 0 4px;
 }
 
-@media (min-width: 480px) {
-    .price-strip {
-        grid-template-columns: repeat(6, 1fr);
-    }
+.price-strip-wrap::-webkit-scrollbar {
+    display: none;
+}
+
+.price-strip {
+    display: flex;
+    gap: 6px;
+    /* Don't wrap — scroll instead */
+    min-width: max-content;
 }
 
 .strip-item {
@@ -1081,6 +1115,9 @@ body {
     border: 1px solid var(--border);
     padding: 10px 12px;
     border-radius: 8px;
+    /* Fixed width so all 6 chips look uniform */
+    min-width: 72px;
+    flex-shrink: 0;
 }
 
 .strip-label {
@@ -1092,7 +1129,7 @@ body {
 }
 
 .strip-val {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--text);
     font-family: var(--font-mono);
@@ -1154,8 +1191,8 @@ body {
 
 /* ── API Panel ── */
 .api-panel {
-    margin-top: 20px;
-    padding-top: 20px;
+    margin-top: 16px;
+    padding-top: 16px;
     border-top: 1px solid var(--border);
 }
 
@@ -1163,14 +1200,17 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
 }
 
 .api-panel-info {
     display: flex;
     flex-direction: column;
     gap: 3px;
+    flex: 1;
+    min-width: 0;
 }
 
 .api-badge {
@@ -1187,28 +1227,30 @@ body {
 }
 
 .api-desc {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-2);
     font-weight: 500;
 }
 
-/* ── Refresh Button — uses token vars ── */
 .refresh-btn {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     background: var(--btn-primary-bg);
     color: var(--btn-primary-text);
     border: none;
     border-radius: 8px;
-    padding: 10px 18px;
+    padding: 0 18px;
     font-size: 13px;
     font-weight: 700;
     font-family: var(--font-head);
     cursor: pointer;
     transition: all 0.2s;
-    min-height: 40px;
+    min-height: var(--touch-min);
     white-space: nowrap;
+    /* Full width when wrapped on very small screens */
+    flex-shrink: 0;
 }
 
 .refresh-btn:hover:not(:disabled) {
@@ -1238,21 +1280,22 @@ body {
 
 .api-key-row {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     margin-bottom: 8px;
 }
 
 .api-input {
     flex: 1;
+    min-width: 0;
     background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: 8px;
     color: var(--text);
     font-family: var(--font-mono);
     font-size: 13px;
-    padding: 10px 14px;
+    padding: 0 12px;
     transition: border 0.2s;
-    min-height: 42px;
+    min-height: var(--touch-min);
 }
 
 .api-input:focus {
@@ -1266,11 +1309,16 @@ body {
     border: 1px solid var(--border);
     color: var(--text-2);
     border-radius: 8px;
-    padding: 0 14px;
+    padding: 0 12px;
     font-size: 16px;
     cursor: pointer;
-    min-height: 42px;
+    min-height: var(--touch-min);
+    min-width: var(--touch-min);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     transition: all 0.2s;
+    flex-shrink: 0;
 }
 
 .paste-btn:hover {
@@ -1283,10 +1331,11 @@ body {
 }
 
 .api-hint {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
     color: var(--text-3);
     font-family: var(--font-head);
+    line-height: 1.5;
 }
 
 .api-hint a {
@@ -1300,20 +1349,20 @@ body {
 
 /* ── Custom Panel ── */
 .custom-panel {
-    margin-top: 20px;
-    padding-top: 20px;
+    margin-top: 16px;
+    padding-top: 16px;
     border-top: 1px solid var(--border);
 }
 
 .method-tabs {
     display: flex;
     gap: 6px;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
 }
 
 .mtab {
     flex: 1;
-    padding: 9px;
+    padding: 0 8px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--surface2);
@@ -1323,7 +1372,11 @@ body {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    min-height: 38px;
+    min-height: var(--touch-min);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
 }
 
 .mtab.active {
@@ -1334,9 +1387,8 @@ body {
 
 .custom-input-row {
     display: flex;
-    align-items: center;
-    gap: 0;
-    margin-bottom: 16px;
+    align-items: stretch;
+    margin-bottom: 14px;
 }
 
 .input-prefix {
@@ -1351,11 +1403,13 @@ body {
     line-height: 1;
     display: flex;
     align-items: center;
-    height: 48px;
+    min-height: var(--touch-min);
+    flex-shrink: 0;
 }
 
 .custom-price-input {
     flex: 1;
+    min-width: 0;
     background: var(--surface2);
     border: 1px solid var(--border);
     border-left: none;
@@ -1363,8 +1417,8 @@ body {
     color: var(--text);
     font-family: var(--font-mono);
     font-size: 18px;
-    padding: 0 16px;
-    height: 48px;
+    padding: 0 14px;
+    min-height: var(--touch-min);
     transition: border 0.2s;
 }
 
@@ -1384,7 +1438,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
+    padding: 11px 14px;
     border-bottom: 1px solid var(--border);
 }
 
@@ -1410,49 +1464,51 @@ body {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 24px 24px 28px;
-    margin-bottom: 20px;
+    padding: 18px 14px 22px;
+    margin-bottom: 16px;
 }
 
 .section-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    gap: 10px;
+    align-items: flex-start;
+    margin-bottom: 16px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 
 .header-actions {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
     flex-wrap: wrap;
 }
 
 .section-title {
-    font-size: 17px;
+    font-size: 16px;
     font-weight: 700;
     letter-spacing: -0.2px;
     color: var(--text);
     line-height: 1.3;
+    /* Prevent wrapping inside section-header */
+    white-space: nowrap;
 }
 
 .section-title::before {
     content: '◈ ';
     color: var(--gold);
-    font-size: 12px;
+    font-size: 11px;
 }
 
 /* ── Converter ── */
 .conv-tabs {
     display: flex;
-    gap: 6px;
-    margin-bottom: 16px;
+    gap: 5px;
+    margin-bottom: 14px;
     overflow-x: auto;
-    padding-bottom: 4px;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    padding-bottom: 2px;
 }
 
 .conv-tabs::-webkit-scrollbar {
@@ -1460,7 +1516,7 @@ body {
 }
 
 .ctab {
-    padding: 8px 14px;
+    padding: 0 12px;
     border-radius: 7px;
     border: 1px solid var(--border);
     background: var(--surface2);
@@ -1471,7 +1527,10 @@ body {
     white-space: nowrap;
     cursor: pointer;
     transition: all 0.2s;
-    min-height: 36px;
+    min-height: 38px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
 }
 
 .ctab.active {
@@ -1483,7 +1542,7 @@ body {
 .conv-body {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 14px;
 }
 
 .conv-input-wrap {
@@ -1496,7 +1555,7 @@ body {
     border: 1px solid var(--border-hi);
     border-right: none;
     border-radius: 8px 0 0 8px;
-    padding: 0 14px;
+    padding: 0 12px;
     color: var(--gold);
     font-family: var(--font-head);
     font-size: 13px;
@@ -1504,12 +1563,13 @@ body {
     display: flex;
     align-items: center;
     white-space: nowrap;
-    height: 48px;
+    min-height: var(--touch-min);
     flex-shrink: 0;
 }
 
 .conv-input {
     flex: 1;
+    min-width: 0;
     background: var(--surface2);
     border: 1px solid var(--border);
     border-left: none;
@@ -1517,8 +1577,8 @@ body {
     color: var(--text);
     font-family: var(--font-mono);
     font-size: 18px;
-    padding: 12px 16px;
-    height: 48px;
+    padding: 0 14px;
+    min-height: var(--touch-min);
 }
 
 .conv-input:focus {
@@ -1537,8 +1597,9 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 16px;
+    padding: 11px 14px;
     border-bottom: 1px solid var(--border);
+    gap: 8px;
 }
 
 .conv-row:last-child {
@@ -1550,6 +1611,7 @@ body {
     font-family: var(--font-head);
     color: var(--text-2);
     font-weight: 500;
+    flex-shrink: 0;
 }
 
 .conv-val {
@@ -1557,25 +1619,27 @@ body {
     font-family: var(--font-mono);
     color: var(--text);
     font-weight: 600;
+    word-break: break-all;
+    text-align: right;
 }
 
-/* ── Unit Grid ── */
+/* ── Unit Grid — 3 cols mobile, 6 cols wide ── */
 .unit-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    gap: 8px;
 }
 
 .unit-tile {
     background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 14px 12px;
+    padding: 12px 10px;
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 4px;
     transition: border-color 0.2s;
-    min-height: 80px;
+    min-height: 76px;
 }
 
 .unit-tile:hover {
@@ -1583,7 +1647,7 @@ body {
 }
 
 .tile-name {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     color: var(--text-2);
     text-transform: uppercase;
@@ -1591,10 +1655,15 @@ body {
 }
 
 .tile-price {
-    font-size: 17px;
+    font-size: 15px;
     font-weight: 700;
     color: var(--text);
     font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+    /* Prevent overflow on very small tiles */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .tile-gram {
@@ -1602,7 +1671,6 @@ body {
     color: var(--text-3);
     font-family: var(--font-mono);
     margin-top: auto;
-    padding-top: 2px;
 }
 
 /* ── Purchases ── */
@@ -1610,14 +1678,17 @@ body {
     background: var(--surface2);
     border: 1px solid var(--border);
     color: var(--text);
-    padding: 9px 16px;
+    padding: 0 14px;
     border-radius: 8px;
     font-size: 13px;
     font-family: var(--font-head);
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    min-height: 38px;
+    min-height: var(--touch-min);
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
 }
 
 .add-btn:hover {
@@ -1629,27 +1700,27 @@ body {
     background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 20px;
+    padding: 16px 14px;
+    margin-bottom: 16px;
     width: 100%;
-    box-sizing: border-box;
 }
 
 .form-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 12px;
-    margin-bottom: 14px;
+    /* 2 cols on mobile, auto-fill on larger */
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 12px;
 }
 
 .fg {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
 }
 
 .fg label {
-    font-size: 12px;
+    font-size: 11px;
     font-family: var(--font-head);
     font-weight: 600;
     color: var(--text-2);
@@ -1666,12 +1737,11 @@ body {
     font-family: var(--font-head);
     font-size: 15px;
     font-weight: 500;
-    padding: 10px 12px;
-    min-height: 44px;
+    padding: 0 12px;
+    min-height: var(--touch-min);
     transition: border 0.2s;
     -webkit-appearance: none;
     width: 100%;
-    box-sizing: border-box;
 }
 
 .fg input:focus,
@@ -1680,20 +1750,22 @@ body {
     border-color: var(--border-hi);
 }
 
-/* ── Save / Submit Button — uses token vars ── */
 .submit-btn {
     width: 100%;
     background: var(--btn-primary-bg);
     color: var(--btn-primary-text);
     border: none;
     border-radius: 8px;
-    padding: 12px;
+    padding: 0 12px;
     font-size: 14px;
     font-weight: 700;
     font-family: var(--font-head);
     cursor: pointer;
     transition: all 0.2s;
-    min-height: 44px;
+    min-height: var(--touch-min);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .submit-btn:hover {
@@ -1701,19 +1773,20 @@ body {
     transform: translateY(-1px);
 }
 
+/* Purchases grid — single col on mobile, multi on wider */
 .purchases-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 12px;
-    margin-top: 16px;
-    margin-bottom: 20px;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-top: 14px;
+    margin-bottom: 16px;
 }
 
 .p-card {
     background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 16px;
+    padding: 14px;
     transition: border-color 0.2s;
 }
 
@@ -1725,7 +1798,8 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
+    gap: 8px;
 }
 
 .pcard-weight {
@@ -1733,11 +1807,16 @@ body {
     font-weight: 700;
     color: var(--text);
     line-height: 1.3;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .pcard-actions {
     display: flex;
     gap: 6px;
+    flex-shrink: 0;
 }
 
 .icon-btn {
@@ -1745,11 +1824,10 @@ body {
     border: 1px solid var(--border);
     color: var(--text-2);
     border-radius: 6px;
-    padding: 6px 11px;
-    font-size: 14px;
+    font-size: 15px;
     cursor: pointer;
-    min-height: 36px;
-    min-width: 36px;
+    min-height: var(--touch-min);
+    min-width: var(--touch-min);
     transition: all 0.2s;
     display: inline-flex;
     align-items: center;
@@ -1776,8 +1854,9 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 0;
+    padding: 7px 0;
     border-bottom: 1px solid var(--border);
+    gap: 8px;
 }
 
 .pcard-row:last-child {
@@ -1789,6 +1868,7 @@ body {
     font-size: 13px;
     font-family: var(--font-head);
     font-weight: 500;
+    flex-shrink: 0;
 }
 
 .pcard-row span:last-child {
@@ -1796,9 +1876,9 @@ body {
     font-size: 14px;
     font-family: var(--font-mono);
     font-weight: 600;
+    text-align: right;
 }
 
-/* ── Gain / Loss colors — purchase cards ── */
 .pcard-row.highlight.gain {
     background: rgba(34, 197, 94, 0.08);
     border-radius: 6px;
@@ -1842,12 +1922,16 @@ body {
 }
 
 .edit-form .form-grid {
-    margin-bottom: 12px;
+    margin-bottom: 10px;
 }
 
 .edit-actions {
     display: flex;
     gap: 8px;
+}
+
+.edit-actions .submit-btn {
+    flex: 1;
 }
 
 .cancel-edit-btn {
@@ -1856,13 +1940,16 @@ body {
     border: 1px solid var(--border);
     color: var(--text-2);
     border-radius: 8px;
-    padding: 12px;
+    padding: 0 12px;
     font-size: 14px;
     font-family: var(--font-head);
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    min-height: 44px;
+    min-height: var(--touch-min);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .cancel-edit-btn:hover {
@@ -1870,22 +1957,18 @@ body {
     color: var(--loss);
 }
 
-.edit-actions .submit-btn {
-    flex: 1;
-}
-
 /* ── Summary ── */
 .summary {
     background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 20px;
+    padding: 16px 14px;
 }
 
 .summary h3 {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     color: var(--text-2);
     font-family: var(--font-head);
     text-transform: uppercase;
@@ -1895,38 +1978,44 @@ body {
 .summary-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    gap: 8px;
     margin-bottom: 16px;
 }
 
 .sum-item {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 4px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 14px 12px;
+    padding: 12px 10px;
+    min-width: 0;
 }
 
 .sum-label {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     color: var(--text-2);
     font-family: var(--font-head);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .sum-val {
-    font-size: 17px;
+    font-size: clamp(14px, 3.5vw, 18px);
     font-weight: 700;
     font-variant-numeric: tabular-nums;
     color: var(--text);
     line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-/* ── Gain / Loss colors — summary ── */
 .sum-item.gain {
     background: var(--card-gain-bg);
     border-color: rgba(34, 197, 94, 0.4);
@@ -1935,7 +2024,6 @@ body {
 
 .sum-item.gain .sum-val {
     color: var(--gain) !important;
-    font-size: 19px;
 }
 
 .sum-item.gain .sum-label {
@@ -1951,7 +2039,6 @@ body {
 
 .sum-item.loss .sum-val {
     color: var(--loss) !important;
-    font-size: 19px;
 }
 
 .sum-item.loss .sum-label {
@@ -1959,6 +2046,7 @@ body {
     opacity: 0.8;
 }
 
+/* ── IO row ── */
 .io-row {
     display: flex;
     gap: 4px;
@@ -1969,14 +2057,16 @@ body {
     border: 1px solid var(--border);
     color: var(--text-2);
     border-radius: 8px;
-    padding: 8px 12px;
+    padding: 0 10px;
     font-size: 12px;
     font-weight: 600;
     font-family: var(--font-head);
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
-    min-height: 38px;
+    min-height: var(--touch-min);
+    display: inline-flex;
+    align-items: center;
 }
 
 .io-btn.export:hover {
@@ -1989,7 +2079,7 @@ body {
     color: var(--gain);
 }
 
-/* ── Card gain/loss accent — bold & visible ── */
+/* ── Card gain/loss accent ── */
 .p-card.gain {
     border-color: rgba(34, 197, 94, 0.5);
     border-left: 3px solid var(--gain);
@@ -2012,7 +2102,6 @@ body {
     box-shadow: 0 0 12px rgba(239, 68, 68, 0.12);
 }
 
-/* ── Current value color ── */
 .current-val.gain {
     color: var(--gain) !important;
     font-weight: 700;
@@ -2029,7 +2118,7 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    padding: 40px 20px;
+    padding: 36px 20px;
     background: var(--surface2);
     border-radius: 12px;
     border: 1px dashed var(--border);
@@ -2051,7 +2140,7 @@ body {
 /* ── Footer ── */
 .footer {
     text-align: center;
-    padding: 24px 16px;
+    padding: 20px 16px;
     font-size: 12px;
     color: var(--text-3);
     font-family: var(--font-head);
@@ -2100,190 +2189,86 @@ body {
 
 .slide-down-enter-to,
 .slide-down-leave-from {
-    max-height: 500px;
+    max-height: 600px;
 }
 
-/* ── Mobile ── */
-@media (max-width: 430px) {
+/* ── Responsive: 480px – tablets ── */
+@media (min-width: 480px) {
     .header-inner {
-        padding: 12px 14px;
+        padding: 14px 20px;
     }
 
     .logo-title {
-        font-size: 17px;
-    }
-
-    .logo-sub {
-        display: none;
+        font-size: 20px;
     }
 
     .main {
-        padding: 12px 10px 40px;
+        padding: 20px 16px 56px;
     }
 
     .price-hero {
-        padding: 16px 14px;
+        padding: 24px 20px;
     }
 
     .section {
-        padding: 16px 14px 20px;
-    }
-
-    .price-tabs {
-        gap: 6px;
-        margin-bottom: 16px;
-    }
-
-    .ptab {
-        font-size: 12px;
-        padding: 9px 8px;
-    }
-
-    .gold-price-value {
-        font-size: 40px;
-        letter-spacing: 0;
-    }
-
-    .gold-price-unit {
-        font-size: 13px;
-    }
-
-    .gold-meta {
-        margin-bottom: 6px;
-    }
-
-    .price-strip {
-        gap: 6px;
-        margin-top: 4px;
-    }
-
-    .strip-item {
-        padding: 8px 8px;
-    }
-
-    .strip-label {
-        font-size: 10px;
-    }
-
-    .strip-val {
-        font-size: 13px;
-    }
-
-    .api-panel-row {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .refresh-btn {
-        width: 100%;
-        justify-content: center;
-    }
-
-    .method-tabs {
-        gap: 4px;
-    }
-
-    .mtab {
-        font-size: 12px;
-        padding: 8px 6px;
-    }
-
-    .form-grid {
-        gap: 10px;
-    }
-
-    .unit-grid {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 8px;
-    }
-
-    .unit-tile {
-        padding: 12px 10px;
-    }
-
-    .tile-price {
-        font-size: 15px;
-    }
-
-    .summary-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-    }
-
-    .sum-item {
-        padding: 12px 10px;
-    }
-
-    .sum-val {
-        font-size: 15px;
+        padding: 20px 18px 24px;
     }
 
     .purchases-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
     }
 
-    .conv-tabs {
-        gap: 4px;
-    }
-
-    .ctab {
-        padding: 7px 10px;
-        font-size: 12px;
-    }
-
-    .section-title {
-        font-size: 16px;
-    }
-
-    .section-header {
-        margin-bottom: 14px;
-    }
-}
-
-@media (min-width: 431px) and (max-width: 640px) {
-    .main {
-        padding: 16px 14px 40px;
-    }
-
-    .price-hero,
-    .section {
-        padding: 20px 18px;
-    }
-
-    .gold-price-value {
-        font-size: 52px;
+    .form-grid {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     }
 
     .unit-grid {
         grid-template-columns: repeat(3, 1fr);
     }
-
-    .summary-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-
-    .api-panel-row {
-        flex-direction: column;
-        align-items: stretch;
-    }
-
-    .refresh-btn {
-        width: 100%;
-        justify-content: center;
-    }
 }
 
-@media (min-width: 641px) {
+/* ── Responsive: 640px+ ── */
+@media (min-width: 640px) {
     .unit-grid {
         grid-template-columns: repeat(6, 1fr);
     }
 
-    .summary-grid {
-        grid-template-columns: repeat(3, 1fr);
+    /* Price strip fits without scroll on wide screens */
+    .price-strip-wrap {
+        overflow: visible;
     }
 
     .price-strip {
+        display: grid;
         grid-template-columns: repeat(6, 1fr);
+        min-width: unset;
+    }
+
+    .strip-item {
+        min-width: unset;
+    }
+
+    .purchases-grid {
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    }
+}
+
+/* ── Responsive: 768px+ ── */
+@media (min-width: 768px) {
+    .price-hero {
+        padding: 28px 28px;
+    }
+
+    .section {
+        padding: 24px 24px 28px;
+    }
+
+    .main {
+        padding: 24px 16px 48px;
+    }
+
+    .logo-title {
+        font-size: 20px;
     }
 }
 </style>
