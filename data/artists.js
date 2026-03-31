@@ -416,7 +416,8 @@ export const DEFAULT_ARTISTS = [
     {
       name: 'Nanami Matsumoto', cover: '',
       url: '',  // Custom cover
-      compilations: [''], mainWorks: ['JUY-858', 'OFES-009', 'SSNI-110']
+      compilations: ['OFJE-509','VOSM-065'], 
+      mainWorks: ['AVSA-185','VENX-093','VRKM-293','VEC-472','VENX-016','MTAFB-002','FPRE-139','MTALL-126','MTALL-115','JUFE-434','AJVR-171','MTALL-025','MTALL-020','VENX-100','NIMA-062','MTAFB-001','FPRE-176','REBD-01-011','JUY-858', 'OFES-009', 'SSNI-110','FPRE-197','CRVR-187','DVMM-381','KTB-112','SAVR-01-01-0','SOAV-134']
     },
     {
       name: 'Rei Kamiki', cover: '',
