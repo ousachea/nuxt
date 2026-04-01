@@ -1,160 +1,175 @@
 <template>
-    <div class="app" :class="{ 'dark': isDark }">
+    <div class="app" :class="{ dark: isDark }">
         <!-- Ambient Background -->
-        <div class="ambient">
+        <div class="ambient" aria-hidden="true">
             <div class="orb orb-1" />
             <div class="orb orb-2" />
-            <div class="orb orb-3" />
         </div>
 
         <!-- Header -->
         <header class="header">
             <div class="header-inner">
                 <div class="logo">
-                    <span class="logo-icon">◈</span>
-                    <div>
-                        <h1 class="logo-title">{{ t.title }}</h1>
-                        <p class="logo-sub">Real-time portfolio tracker</p>
+                    <span class="logo-gem">◈</span>
+                    <div class="logo-text">
+                        <span class="logo-title">{{ t.title }}</span>
+                        <span class="logo-sub">gold portfolio tracker</span>
                     </div>
                 </div>
                 <div class="header-controls">
-                    <button class="ctrl-btn" @click="toggleDark" :title="isDark ? 'Light mode' : 'Dark mode'">
-                        {{ isDark ? '☀' : '◐' }}
+                    <button class="ctrl-btn" @click="toggleDark" :aria-label="isDark ? 'Light mode' : 'Dark mode'">
+                        <span>{{ isDark ? '☀' : '◑' }}</span>
                     </button>
-                    <button class="ctrl-btn lang" @click="toggleLang">
+                    <button class="ctrl-btn lang-btn" @click="toggleLang"
+                        :aria-label="lang === 'en' ? 'Switch to Khmer' : 'Switch to English'">
                         {{ lang === 'en' ? 'ខ្មែរ' : 'EN' }}
                     </button>
                 </div>
             </div>
-            <div v-if="!isOnline" class="offline-bar">
-                <span>◈</span> {{ t.offlineWarning }}
+            <div v-if="!isOnline" class="offline-bar" role="alert">
+                ⚠ {{ t.offlineWarning }}
             </div>
         </header>
 
+        <!-- Sticky Price Pill (visible when scrolled) -->
+        <div class="sticky-price" :class="{ visible: showStickyPrice && goldPrice }">
+            <span class="sticky-gem">◈</span>
+            <span class="sticky-val">${{ goldPrice?.toFixed(2) ?? '——' }}</span>
+            <span class="sticky-unit">/ oz</span>
+            <button class="sticky-refresh" @click="fetchPrice" :disabled="loading">↻</button>
+        </div>
+
         <main class="main">
-            <!-- Price Hero -->
-            <section class="price-hero">
-                <div class="price-tabs">
-                    <button v-for="src in ['api', 'custom']" :key="src" class="ptab"
-                        :class="{ active: priceSource === src }" @click="priceSource = src">
-                        {{ src === 'api' ? '⬡ Live Price' : '✦ Custom' }}
+
+            <!-- ── PRICE SECTION ── -->
+            <section class="card price-hero">
+                <div class="card-accent" />
+
+                <!-- Source Toggle -->
+                <div class="seg-ctrl">
+                    <button class="seg-btn" :class="{ active: priceSource === 'api' }" @click="priceSource = 'api'">
+                        ⬡ {{ t.live }}
+                    </button>
+                    <button class="seg-btn" :class="{ active: priceSource === 'custom' }"
+                        @click="priceSource = 'custom'">
+                        ✦ {{ t.custom }}
                     </button>
                 </div>
 
-                <!-- Live Price Display -->
-                <div class="gold-display">
-                    <div class="gold-meta">
-                        <span class="metal-label">🥇 {{ t.gold }}</span>
-                        <span v-if="lastUpdated && priceSource === 'api'" class="update-time">{{ lastUpdated }}</span>
+                <!-- Big Price -->
+                <div class="hero-price-block">
+                    <div class="hero-meta-row">
+                        <span class="metal-tag">🥇 {{ t.gold }}</span>
+                        <span v-if="lastUpdated && priceSource === 'api'" class="last-updated">{{ lastUpdated }}</span>
                     </div>
-                    <div class="gold-price-row">
-                        <transition name="price-flip" mode="out-in">
-                            <span class="gold-price-value" :key="goldPrice">
-                                {{ goldPrice ? '$' + goldPrice.toFixed(2) : '——' }}
-                            </span>
-                        </transition>
-                        <span class="gold-price-unit">/ troy oz</span>
-                    </div>
-
-                    <!-- Per-unit strip — scrollable on mobile -->
-                    <div v-if="goldPrice" class="price-strip-wrap">
-                        <div class="price-strip">
-                            <div v-for="u in priceUnits" :key="u.key" class="strip-item">
-                                <span class="strip-label">{{ t[u.key] || u.label }}</span>
-                                <span class="strip-val">${{ u.price.toFixed(2) }}</span>
-                            </div>
+                    <transition name="price-flip" mode="out-in">
+                        <div class="hero-price" :key="goldPrice?.toFixed(0) ?? 'null'">
+                            <span class="price-dollar">$</span>
+                            <span class="price-int">{{ goldPrice ? Math.floor(goldPrice).toLocaleString() : '——'
+                                }}</span>
+                            <span v-if="goldPrice" class="price-dec">.{{ (goldPrice % 1).toFixed(2).slice(2) }}</span>
                         </div>
+                    </transition>
+                    <span class="price-unit-label">{{ t.perTroyOz }}</span>
+                </div>
+
+                <!-- Per-unit chips -->
+                <div v-if="goldPrice" class="chips-scroll">
+                    <div v-for="u in priceUnits" :key="u.key" class="chip">
+                        <span class="chip-label">{{ t[u.key] || u.label }}</span>
+                        <span class="chip-price">${{ u.price < 1 ? u.price.toFixed(4) : u.price.toFixed(2) }}</span>
                     </div>
                 </div>
 
-                <!-- Loading bar -->
-                <div v-if="loading" class="load-bar">
-                    <div class="load-fill" />
+                <!-- Loading -->
+                <div v-if="loading" class="progress-bar">
+                    <div class="progress-fill" />
                 </div>
 
-                <!-- Success / Error -->
+                <!-- Flash -->
                 <transition name="fade">
-                    <div v-if="flashMsg" class="flash" :class="flashType">{{ flashMsg }}</div>
+                    <div v-if="flashMsg" class="flash" :class="flashType" role="alert">{{ flashMsg }}</div>
                 </transition>
 
-                <!-- API Source Panel -->
-                <div v-if="priceSource === 'api'" class="api-panel">
-                    <div class="api-panel-row">
-                        <div class="api-panel-info">
+                <!-- API Panel -->
+                <div v-if="priceSource === 'api'" class="sub-panel">
+                    <div class="sub-panel-row">
+                        <div class="api-info">
                             <span class="api-badge">gold-api.com</span>
-                            <span class="api-desc">Optional API key for higher limits</span>
+                            <span class="api-hint-text">{{ t.apiHint }}</span>
                         </div>
-                        <button class="refresh-btn" @click="fetchPrice" :disabled="loading">
-                            <span class="spin-icon" :class="{ spinning: loading }">↻</span>
-                            {{ loading ? t.loading : t.refreshNow }}
+                        <button class="primary-btn refresh-btn" @click="fetchPrice" :disabled="loading">
+                            <span :class="{ 'spin': loading }">↻</span>
+                            {{ loading ? t.loading : t.refresh }}
                         </button>
                     </div>
                     <div class="api-key-row">
-                        <input v-model="customApiUrl" class="api-input" type="text"
-                            placeholder="Paste API key (optional)…" />
-                        <button class="paste-btn" @click="pasteClipboard">📋</button>
-                        <button v-if="customApiUrl" class="clear-btn" @click="customApiUrl = ''; save()">✕</button>
+                        <input v-model="customApiUrl" class="text-input" type="text" :placeholder="t.apiKeyPlaceholder"
+                            autocomplete="off" autocorrect="off" spellcheck="false" />
+                        <button class="icon-btn-sm" @click="pasteClipboard" :title="t.paste">📋</button>
+                        <button v-if="customApiUrl" class="icon-btn-sm danger" @click="customApiUrl = ''; save()"
+                            :title="t.clear">✕</button>
                     </div>
-                    <p class="api-hint">Live prices via <strong>gold-api.com</strong> (free, no key) · Optional: add a
-                        <a href="https://www.goldapi.io/" target="_blank">goldapi.io</a> key as fallback
+                    <p class="api-hint">
+                        {{ t.freeNoKey }} ·
+                        <a href="https://www.goldapi.io/" target="_blank" rel="noopener">goldapi.io</a>
+                        {{ t.asBackup }}
                     </p>
                 </div>
 
-                <!-- Custom Price Panel -->
-                <div v-if="priceSource === 'custom'" class="custom-panel">
+                <!-- Custom Panel -->
+                <div v-if="priceSource === 'custom'" class="sub-panel">
                     <div class="method-tabs">
-                        <button v-for="m in ['troyOz', 'damlung', 'chi']" :key="m" class="mtab"
+                        <button v-for="m in ['troyOz', 'damlung', 'chi']" :key="m" class="method-btn"
                             :class="{ active: priceMethod === m }" @click="switchMethod(m)">
-                            {{ m === 'troyOz' ? t.troyOunce : t[m] }}
+                            {{ m === 'troyOz' ? t.troyOz : t[m] }}
                         </button>
                     </div>
-                    <div class="custom-input-row">
+                    <div class="price-input-row">
                         <span class="input-prefix">$</span>
-                        <input v-model.number="customPrice" class="custom-price-input" type="text" inputmode="decimal"
-                            :placeholder="'Price per ' + (priceMethod === 'troyOz' ? 'Troy Oz' : priceMethod === 'damlung' ? 'Damlung' : 'Chi')"
+                        <input v-model.number="customPrice" class="text-input price-input" type="text"
+                            inputmode="decimal"
+                            :placeholder="t.enterPriceFor + ' ' + (priceMethod === 'troyOz' ? t.troyOz : priceMethod === 'damlung' ? t.damlung : t.chi)"
                             @input="applyCustomPrice" />
-                    </div>
-                    <div v-if="goldPrice" class="custom-preview">
-                        <div v-for="u in priceUnits" :key="u.key" class="prev-row">
-                            <span>{{ t[u.key] || u.label }}</span>
-                            <span>${{ u.price.toFixed(2) }}</span>
-                        </div>
                     </div>
                 </div>
             </section>
 
-            <!-- Converter -->
-            <section class="section">
+            <!-- ── CONVERTER ── -->
+            <section class="card">
                 <h2 class="section-title">{{ t.unitConverter }}</h2>
-                <div class="conv-tabs">
-                    <button v-for="u in converterUnits" :key="u" class="ctab" :class="{ active: activeConv === u }"
+
+                <div class="conv-tabs-scroll">
+                    <button v-for="u in converterUnits" :key="u" class="conv-tab" :class="{ active: activeConv === u }"
                         @click="activeConv = u">
                         {{ t[u] || u }}
                     </button>
                 </div>
-                <div class="conv-body">
-                    <div class="conv-input-wrap">
-                        <span class="conv-unit-badge">{{ t[activeConv] }}</span>
-                        <input v-model.number="convInput" class="conv-input" type="text" inputmode="decimal"
-                            :placeholder="'Enter ' + (t[activeConv] || activeConv)" />
-                    </div>
-                    <div class="conv-results">
-                        <div v-for="u in converterUnits.filter(x => x !== activeConv)" :key="u" class="conv-row">
-                            <span class="conv-label">{{ t[u] }}</span>
-                            <span class="conv-val">{{ convertUnit(convInput || 0, activeConv, u) }}</span>
-                        </div>
+
+                <div class="conv-input-row">
+                    <div class="from-badge">{{ t[activeConv] }}</div>
+                    <input v-model.number="convInput" class="text-input conv-input" type="text" inputmode="decimal"
+                        :placeholder="'1'" />
+                </div>
+
+                <div class="conv-results">
+                    <div v-for="u in converterUnits.filter(x => x !== activeConv)" :key="u" class="conv-row">
+                        <span class="conv-label">{{ t[u] }}</span>
+                        <span class="conv-val">{{ convertUnit(convInput || 0, activeConv, u) }}</span>
                     </div>
                 </div>
             </section>
 
-            <!-- Price Grid -->
-            <section class="section">
+            <!-- ── PRICE GRID ── -->
+            <section class="card">
                 <h2 class="section-title">{{ t.priceByUnit }}</h2>
                 <div v-if="goldPrice" class="unit-grid">
                     <div v-for="u in allUnits" :key="u.key" class="unit-tile">
-                        <span class="tile-name">{{ t[u.key] || u.label }}</span>
-                        <span class="tile-price">${{ u.price.toFixed(2) }}</span>
-                        <span class="tile-gram">{{ u.gram }}</span>
+                        <div class="tile-top">
+                            <span class="tile-name">{{ t[u.key] || u.label }}</span>
+                            <span class="tile-gram">{{ u.gram }}</span>
+                        </div>
+                        <span class="tile-price">${{ u.price < 1 ? u.price.toFixed(4) : u.price.toFixed(2) }}</span>
                     </div>
                 </div>
                 <div v-else class="empty-state">
@@ -163,108 +178,117 @@
                 </div>
             </section>
 
-            <!-- Purchases -->
-            <section class="section">
+            <!-- ── PURCHASES ── -->
+            <section class="card">
                 <div class="section-header">
                     <h2 class="section-title">{{ t.myPurchases }}</h2>
-                    <div class="header-actions">
-                        <div class="io-row">
-                            <button class="io-btn export" @click="exportCSV">↓ {{ t.exportCSV }}</button>
-                            <button class="io-btn import" @click="csvInput.click()">↑ {{ t.importCSV }}</button>
-                            <input ref="csvInput" type="file" accept=".csv" hidden @change="importCSV" />
-                        </div>
-                        <button class="add-btn" @click="showForm = !showForm">
-                            {{ showForm ? t.cancel : t.addPurchase }}
-                        </button>
+                    <div class="section-actions">
+                        <button class="ghost-btn" @click="exportCSV">↓ CSV</button>
+                        <button class="ghost-btn" @click="csvInput.click()">↑ CSV</button>
+                        <input ref="csvInput" type="file" accept=".csv" hidden @change="importCSV" />
                     </div>
                 </div>
+
+                <!-- FAB-style Add Button -->
+                <button class="add-purchase-btn" @click="showForm = !showForm">
+                    <span class="add-icon">{{ showForm ? '✕' : '+' }}</span>
+                    <span>{{ showForm ? t.cancel : t.addPurchase }}</span>
+                </button>
 
                 <!-- Add Form -->
                 <transition name="slide-down">
                     <div v-if="showForm" class="purchase-form">
                         <div class="form-grid">
-                            <div class="fg">
+                            <div class="form-field">
                                 <label>{{ t.weight }}</label>
                                 <input v-model.number="draft.weight" type="text" inputmode="decimal"
-                                    :placeholder="t.enterWeight" />
+                                    :placeholder="t.enterWeight" class="text-input" />
                             </div>
-                            <div class="fg">
+                            <div class="form-field">
                                 <label>{{ t.unit }}</label>
-                                <select v-model="draft.unit">
+                                <select v-model="draft.unit" class="text-input">
                                     <option v-for="u in converterUnits" :key="u" :value="u">{{ t[u] || u }}</option>
                                 </select>
                             </div>
-                            <div class="fg">
+                            <div class="form-field">
                                 <label>{{ t.pricePaid }} (USD)</label>
                                 <input v-model.number="draft.price" type="text" inputmode="decimal"
-                                    :placeholder="t.enterPrice" />
+                                    :placeholder="t.enterPrice" class="text-input" />
                             </div>
-                            <div class="fg">
+                            <div class="form-field">
                                 <label>{{ t.date }}</label>
-                                <input v-model="draft.date" type="date" />
+                                <input v-model="draft.date" type="date" class="text-input" />
                             </div>
                         </div>
-                        <button class="submit-btn" @click="addPurchase">✦ {{ t.save }}</button>
+                        <button class="primary-btn full-btn" @click="addPurchase">✦ {{ t.save }}</button>
                     </div>
                 </transition>
 
-                <!-- Cards -->
-                <div v-if="purchases.length" class="purchases-grid">
+                <!-- Purchase Cards -->
+                <div v-if="purchases.length" class="purchases-list">
                     <div v-for="(p, i) in purchases" :key="p.id" class="p-card" :class="gainClass(p)">
                         <template v-if="editIdx !== i">
-                            <div class="pcard-top">
-                                <div class="pcard-weight">🥇 {{ p.weight }} {{ t[p.unit] || p.unit }}</div>
-                                <div class="pcard-actions">
-                                    <button class="icon-btn" @click="startEdit(i)">✎</button>
-                                    <button class="icon-btn danger" @click="removePurchase(i)">✕</button>
+                            <!-- Card Header -->
+                            <div class="pcard-header">
+                                <div class="pcard-weight-row">
+                                    <span class="pcard-weight">{{ p.weight }} <span class="pcard-unit">{{ t[p.unit] ||
+        p.unit }}</span></span>
+                                    <span class="pcard-date">{{ formatDate(p.date) }}</span>
+                                </div>
+                                <div class="pcard-btns">
+                                    <button class="pcard-btn" @click="startEdit(i)" :aria-label="t.edit">✎</button>
+                                    <button class="pcard-btn danger" @click="removePurchase(i)"
+                                        :aria-label="t.delete">✕</button>
                                 </div>
                             </div>
-                            <div class="pcard-rows">
-                                <div class="pcard-row">
-                                    <span>{{ t.paid }}</span>
-                                    <span>${{ p.price.toFixed(2) }}</span>
+                            <!-- GL Bar -->
+                            <div class="gl-row">
+                                <div class="gl-col">
+                                    <span class="gl-label">{{ t.paid }}</span>
+                                    <span class="gl-val">${{ p.price.toFixed(2) }}</span>
                                 </div>
-                                <div class="pcard-row">
-                                    <span>{{ t.current }}</span>
-                                    <span class="current-val" :class="gainClass(p)">${{ currentValue(p).toFixed(2)
-                                        }}</span>
+                                <div class="gl-divider" />
+                                <div class="gl-col">
+                                    <span class="gl-label">{{ t.current }}</span>
+                                    <span class="gl-val" :class="gainClass(p)">${{ currentValue(p).toFixed(2) }}</span>
                                 </div>
-                                <div class="pcard-row highlight" :class="gainClass(p)">
-                                    <span>{{ t.gainLoss }}</span>
-                                    <span>
+                                <div class="gl-divider" />
+                                <div class="gl-col">
+                                    <span class="gl-label">{{ t.gainLoss }}</span>
+                                    <span class="gl-val gl-main" :class="gainClass(p)">
                                         {{ gainLoss(p) >= 0 ? '+' : '' }}${{ gainLoss(p).toFixed(2) }}
                                     </span>
                                 </div>
                             </div>
-                            <span class="pcard-date">{{ formatDate(p.date) }}</span>
                         </template>
+
+                        <!-- Edit Form -->
                         <template v-else>
-                            <div class="edit-form">
-                                <div class="form-grid">
-                                    <div class="fg">
-                                        <label>{{ t.weight }}</label>
-                                        <input v-model.number="editDraft.weight" type="text" inputmode="decimal" />
-                                    </div>
-                                    <div class="fg">
-                                        <label>{{ t.unit }}</label>
-                                        <select v-model="editDraft.unit">
-                                            <option v-for="u in converterUnits" :key="u" :value="u">{{ t[u] || u }}
-                                            </option>
-                                        </select>
-                                    </div>
-                                    <div class="fg">
-                                        <label>{{ t.pricePaid }}</label>
-                                        <input v-model.number="editDraft.price" type="text" inputmode="decimal" />
-                                    </div>
-                                    <div class="fg">
-                                        <label>{{ t.date }}</label>
-                                        <input v-model="editDraft.date" type="date" />
-                                    </div>
+                            <div class="form-grid">
+                                <div class="form-field">
+                                    <label>{{ t.weight }}</label>
+                                    <input v-model.number="editDraft.weight" type="text" inputmode="decimal"
+                                        class="text-input" />
                                 </div>
-                                <div class="edit-actions">
-                                    <button class="submit-btn" @click="saveEdit">{{ t.save }}</button>
-                                    <button class="cancel-edit-btn" @click="editIdx = null">{{ t.cancel }}</button>
+                                <div class="form-field">
+                                    <label>{{ t.unit }}</label>
+                                    <select v-model="editDraft.unit" class="text-input">
+                                        <option v-for="u in converterUnits" :key="u" :value="u">{{ t[u] || u }}</option>
+                                    </select>
                                 </div>
+                                <div class="form-field">
+                                    <label>{{ t.pricePaid }}</label>
+                                    <input v-model.number="editDraft.price" type="text" inputmode="decimal"
+                                        class="text-input" />
+                                </div>
+                                <div class="form-field">
+                                    <label>{{ t.date }}</label>
+                                    <input v-model="editDraft.date" type="date" class="text-input" />
+                                </div>
+                            </div>
+                            <div class="edit-actions">
+                                <button class="primary-btn" style="flex:1" @click="saveEdit">{{ t.save }}</button>
+                                <button class="ghost-btn" style="flex:1" @click="editIdx = null">{{ t.cancel }}</button>
                             </div>
                         </template>
                     </div>
@@ -272,8 +296,7 @@
 
                 <!-- Portfolio Summary -->
                 <div v-if="purchases.length" class="summary">
-                    <h3>{{ t.portfolioSummary }}</h3>
-                    <div class="summary-grid">
+                    <div class="sum-row">
                         <div class="sum-item">
                             <span class="sum-label">{{ t.totalInvested }}</span>
                             <span class="sum-val">${{ totalInvested.toFixed(2) }}</span>
@@ -284,22 +307,29 @@
                         </div>
                         <div class="sum-item" :class="totalGL >= 0 ? 'gain' : 'loss'">
                             <span class="sum-label">{{ t.totalGainLoss }}</span>
-                            <span class="sum-val">
-                                {{ totalGL >= 0 ? '+' : '' }}${{ totalGL.toFixed(2) }}
-                            </span>
+                            <span class="sum-val">{{ totalGL >= 0 ? '+' : '' }}${{ totalGL.toFixed(2) }}</span>
                         </div>
+                    </div>
+                    <!-- Mini progress bar showing gain/loss ratio -->
+                    <div v-if="totalInvested > 0" class="portfolio-bar">
+                        <div class="portfolio-fill" :class="totalGL >= 0 ? 'gain' : 'loss'"
+                            :style="{ width: Math.min(Math.abs(totalGL / totalInvested) * 100, 100) + '%' }" />
+                    </div>
+                    <div v-if="totalInvested > 0" class="portfolio-pct" :class="totalGL >= 0 ? 'gain' : 'loss'">
+                        {{ totalGL >= 0 ? '▲' : '▼' }} {{ Math.abs(totalGL / totalInvested * 100).toFixed(1) }}%
                     </div>
                 </div>
 
                 <div v-else-if="!showForm" class="empty-state">
                     <span class="empty-icon">◈</span>
-                    <p>No purchases yet. Add your first one above.</p>
+                    <p>{{ t.noPurchases }}</p>
                 </div>
             </section>
+
         </main>
 
         <footer class="footer">
-            <p>Gold Tracker · Built with Nuxt 3 · Prices in USD</p>
+            <p>Gold Tracker · Nuxt 3 · Prices USD</p>
         </footer>
     </div>
 </template>
@@ -307,7 +337,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 const TROY = 31.1035
 const DAMLUNG = 37.5
 const CHI = 3.75
@@ -316,9 +346,9 @@ const LI = 0.0375
 
 const converterUnits = ['li', 'hun', 'chi', 'gram', 'damlung', 'troyOz']
 
-// ─── State ───────────────────────────────────────────────────────────────────
+// ─── State ────────────────────────────────────────────────────────────────────
 const lang = ref('en')
-const isDark = ref(false)
+const isDark = ref(true)
 const isOnline = ref(true)
 const priceSource = ref('api')
 const priceMethod = ref('troyOz')
@@ -329,180 +359,158 @@ const lastUpdated = ref('')
 const loading = ref(false)
 const flashMsg = ref('')
 const flashType = ref('success')
-const activeConv = ref('gram')
+const activeConv = ref('chi')
 const convInput = ref(1)
 const showForm = ref(false)
+const showStickyPrice = ref(false)
 const purchases = ref([])
 const draft = ref({ weight: '', unit: 'chi', price: '', date: today() })
 const editIdx = ref(null)
 const editDraft = ref({})
 const csvInput = ref(null)
 
-// ─── Translations ─────────────────────────────────────────────────────────────
+// ─── i18n ────────────────────────────────────────────────────────────────────
 const translations = {
     en: {
         title: 'Gold Tracker',
         gold: 'Gold',
-        currentPrice: 'Current Prices',
-        refreshNow: 'Refresh',
+        live: 'Live',
+        custom: 'Custom',
+        refresh: 'Refresh',
         loading: 'Loading…',
-        pricesUpdated: '✓ Prices updated',
+        pricesUpdated: '✓ Updated',
         perTroyOz: '/ troy oz',
-        lastUpdated: 'Updated',
         priceByUnit: 'Price by Unit',
         unitConverter: 'Unit Converter',
-        from: 'From',
         myPurchases: 'My Purchases',
-        addPurchase: '+ Add',
+        addPurchase: 'Add Purchase',
         cancel: 'Cancel',
         weight: 'Weight',
         unit: 'Unit',
         pricePaid: 'Price Paid',
         date: 'Date',
         save: 'Save',
+        edit: 'Edit',
+        delete: 'Delete',
         paid: 'Paid',
         current: 'Current',
-        gainLoss: 'Gain / Loss',
-        portfolioSummary: 'Portfolio Summary',
-        totalInvested: 'Total Invested',
-        currentValue: 'Current Value',
+        gainLoss: 'G / L',
+        portfolioSummary: 'Portfolio',
+        totalInvested: 'Invested',
+        currentValue: 'Value Now',
         totalGainLoss: 'Total G/L',
-        exportCSV: 'Export CSV',
-        importCSV: 'Import CSV',
+        exportCSV: 'Export',
+        importCSV: 'Import',
         enterWeight: 'e.g. 2',
         enterPrice: 'e.g. 240',
+        enterPriceFor: 'Price per',
+        apiHint: 'Optional API key for higher rate limits',
+        apiKeyPlaceholder: 'Paste goldapi.io key (optional)…',
+        freeNoKey: 'Free, no key needed',
+        asBackup: 'key as fallback',
+        paste: 'Paste',
+        clear: 'Clear',
         gram: 'Gram', li: 'Li', hun: 'Hun', chi: 'Chi',
         damlung: 'Damlung', troyOunce: 'Troy Oz', troyOz: 'Troy Oz',
-        fetchPriceFirst: 'Fetch price first',
-        offlineWarning: 'You are offline. Prices may be outdated.',
+        fetchPriceFirst: 'Fetch a price first',
+        offlineWarning: 'You are offline — prices may be outdated',
+        noPurchases: 'No purchases yet. Tap + Add above.',
     },
     km: {
         title: 'តាមដានមាស',
         gold: 'មាស',
-        currentPrice: 'តម្លៃបច្ចុប្បន្ន',
-        refreshNow: 'ធ្វើបច្ចុប្បន្នភាព',
+        live: 'បន្តផ្ទាល់',
+        custom: 'កំណត់ផ្ទាល់',
+        refresh: 'ធ្វើបច្ចុប្បន្នភាព',
         loading: 'កំពុងផ្ទុក…',
         pricesUpdated: '✓ បានធ្វើបច្ចុប្បន្នភាព',
         perTroyOz: '/ ត្រយ អោន',
-        lastUpdated: 'ធ្វើបច្ចុប្បន្នភាព',
         priceByUnit: 'តម្លៃតាមឯកតា',
         unitConverter: 'បម្លែងឯកតា',
-        from: 'ពី',
         myPurchases: 'ការទិញរបស់ខ្ញុំ',
-        addPurchase: '+ បន្ថែម',
+        addPurchase: 'បន្ថែម',
         cancel: 'បោះបង់',
         weight: 'ទម្ងន់',
         unit: 'ឯកតា',
         pricePaid: 'តម្លៃបង់',
         date: 'កាលបរិច្ឆេទ',
-        save: 'រក្សា',
+        save: 'រក្សាទុក',
+        edit: 'កែ',
+        delete: 'លុប',
         paid: 'បង់',
         current: 'បច្ចុប្បន្ន',
         gainLoss: 'ចំណេញ/ខាត',
         portfolioSummary: 'សង្ខេប',
-        totalInvested: 'វិនិយោគសរុប',
-        currentValue: 'តម្លៃបច្ចុប្បន្ន',
-        totalGainLoss: 'ចំណេញ/ខាតសរុប',
-        exportCSV: 'នាំចេញ CSV',
-        importCSV: 'នាំចូល CSV',
+        totalInvested: 'វិនិយោគ',
+        currentValue: 'តម្លៃ',
+        totalGainLoss: 'ចំណេញ/ខាត',
+        exportCSV: 'នាំចេញ',
+        importCSV: 'នាំចូល',
         enterWeight: 'ឧ. ២',
         enterPrice: 'ឧ. ២៤០',
+        enterPriceFor: 'តម្លៃ',
+        apiHint: 'ស្រេចចិត្ត API key',
+        apiKeyPlaceholder: 'បិទភ្ជាប់ goldapi.io key…',
+        freeNoKey: 'ឥតគិតថ្លៃ',
+        asBackup: 'key ជាបម្រុង',
+        paste: 'បិទភ្ជាប់',
+        clear: 'លុប',
         gram: 'ក្រាម', li: 'លី', hun: 'ហុន', chi: 'ជី',
         damlung: 'ដំឡឹង', troyOunce: 'ត្រយ អោន', troyOz: 'ត្រយ អោន',
         fetchPriceFirst: 'សូមទាញតម្លៃជាមុន',
-        offlineWarning: '⚠ អ្នកស្ថិតក្រៅបណ្តាញ',
+        offlineWarning: '⚠ ក្រៅបណ្តាញ',
+        noPurchases: 'មិនទាន់មានការទិញ។ ចុច + បន្ថែម',
     }
 }
-
 const t = computed(() => translations[lang.value])
 
 // ─── Price computations ───────────────────────────────────────────────────────
 const pricePerGram = computed(() => goldPrice.value ? goldPrice.value / TROY : 0)
-const priceLi = computed(() => pricePerGram.value * LI)
-const priceHun = computed(() => pricePerGram.value * HUN)
-const priceChi = computed(() => pricePerGram.value * CHI)
-const priceDamlung = computed(() => pricePerGram.value * DAMLUNG)
-
 const priceUnits = computed(() => [
-    { key: 'li', label: 'Li', price: priceLi.value },
-    { key: 'hun', label: 'Hun', price: priceHun.value },
-    { key: 'chi', label: 'Chi', price: priceChi.value },
+    { key: 'li', label: 'Li', price: pricePerGram.value * LI },
+    { key: 'hun', label: 'Hun', price: pricePerGram.value * HUN },
+    { key: 'chi', label: 'Chi', price: pricePerGram.value * CHI },
     { key: 'gram', label: 'Gram', price: pricePerGram.value },
-    { key: 'damlung', label: 'Damlung', price: priceDamlung.value },
+    { key: 'damlung', label: 'Damlung', price: pricePerGram.value * DAMLUNG },
     { key: 'troyOz', label: 'Troy Oz', price: goldPrice.value || 0 },
 ])
-
 const allUnits = computed(() => [
-    { key: 'li', label: 'Li', price: priceLi.value, gram: '0.0375g' },
-    { key: 'hun', label: 'Hun', price: priceHun.value, gram: '0.375g' },
-    { key: 'chi', label: 'Chi', price: priceChi.value, gram: '3.75g' },
+    { key: 'li', label: 'Li', price: pricePerGram.value * LI, gram: '0.0375g' },
+    { key: 'hun', label: 'Hun', price: pricePerGram.value * HUN, gram: '0.375g' },
+    { key: 'chi', label: 'Chi', price: pricePerGram.value * CHI, gram: '3.75g' },
     { key: 'gram', label: 'Gram', price: pricePerGram.value, gram: '1g' },
-    { key: 'damlung', label: 'Damlung', price: priceDamlung.value, gram: '37.5g' },
+    { key: 'damlung', label: 'Damlung', price: pricePerGram.value * DAMLUNG, gram: '37.5g' },
     { key: 'troyOz', label: 'Troy Oz', price: goldPrice.value || 0, gram: '31.1g' },
 ])
 
-// ─── Portfolio computations ───────────────────────────────────────────────────
 const totalInvested = computed(() => purchases.value.reduce((s, p) => s + p.price, 0))
 const totalCurrent = computed(() => purchases.value.reduce((s, p) => s + currentValue(p), 0))
 const totalGL = computed(() => totalCurrent.value - totalInvested.value)
 
-// ─── Methods ──────────────────────────────────────────────────────────────────
-function today() {
-    return new Date().toISOString().split('T')[0]
-}
+// ─── Methods ─────────────────────────────────────────────────────────────────
+function today() { return new Date().toISOString().split('T')[0] }
+function toggleLang() { lang.value = lang.value === 'en' ? 'km' : 'en'; save() }
+function toggleDark() { isDark.value = !isDark.value; save() }
 
-function toggleLang() {
-    lang.value = lang.value === 'en' ? 'km' : 'en'
-    save()
+function toGrams(w, u) {
+    return w * ({ li: LI, hun: HUN, chi: CHI, gram: 1, damlung: DAMLUNG, troyOz: TROY }[u] || 1)
 }
-
-function toggleDark() {
-    isDark.value = !isDark.value
-    save()
+function fromGrams(g, u) {
+    return g / ({ li: LI, hun: HUN, chi: CHI, gram: 1, damlung: DAMLUNG, troyOz: TROY }[u] || 1)
 }
-
-function toGrams(weight, unit) {
-    const map = { li: LI, hun: HUN, chi: CHI, gram: 1, damlung: DAMLUNG, troyOz: TROY }
-    return weight * (map[unit] || 1)
-}
-
-function fromGrams(grams, unit) {
-    const map = { li: LI, hun: HUN, chi: CHI, gram: 1, damlung: DAMLUNG, troyOz: TROY }
-    return grams / (map[unit] || 1)
-}
-
-function convertUnit(val, from, to) {
-    return fromGrams(toGrams(val, from), to).toFixed(4)
-}
-
-function currentValue(p) {
-    if (!goldPrice.value) return 0
-    return pricePerGram.value * toGrams(p.weight, p.unit)
-}
-
-function gainLoss(p) {
-    return currentValue(p) - p.price
-}
-
-function gainClass(p) {
-    return gainLoss(p) >= 0 ? 'gain' : 'loss'
-}
-
-function formatDate(d) {
-    return new Date(d).toLocaleDateString()
-}
+function convertUnit(val, from, to) { return fromGrams(toGrams(val, from), to).toFixed(4) }
+function currentValue(p) { return goldPrice.value ? pricePerGram.value * toGrams(p.weight, p.unit) : 0 }
+function gainLoss(p) { return currentValue(p) - p.price }
+function gainClass(p) { return gainLoss(p) >= 0 ? 'gain' : 'loss' }
+function formatDate(d) { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) }
 
 function flash(msg, type = 'success') {
-    flashMsg.value = msg
-    flashType.value = type
+    flashMsg.value = msg; flashType.value = type
     setTimeout(() => flashMsg.value = '', 3000)
 }
 
 function switchMethod(m) {
-    priceMethod.value = m
-    customPrice.value = null
-    goldPrice.value = null
-    save()
+    priceMethod.value = m; customPrice.value = null; goldPrice.value = null; save()
 }
 
 function applyCustomPrice() {
@@ -520,207 +528,148 @@ async function pasteClipboard() {
         const text = await navigator.clipboard.readText()
         if (text?.trim()) customApiUrl.value = text.trim()
         else flash('Clipboard is empty', 'error')
-    } catch {
-        flash('Allow clipboard access or paste manually (Ctrl+V)', 'error')
-    }
+    } catch { flash('Allow clipboard access or paste manually', 'error') }
 }
 
 async function fetchPrice() {
     loading.value = true
     let ok = false
-    const errors = []
-
-    if (!ok) {
-        try {
-            const r = await fetch('https://api.gold-api.com/price/XAU', { mode: 'cors' })
-            if (r.ok) {
-                const d = await r.json()
-                const p = d?.price ?? d?.ask ?? d?.bid
-                if (p && !isNaN(p)) { goldPrice.value = parseFloat(p); ok = true }
-                else errors.push('gold-api.com: unexpected shape — ' + JSON.stringify(d).slice(0, 80))
-            } else {
-                errors.push('gold-api.com: HTTP ' + r.status)
-            }
-        } catch (e) {
-            errors.push('gold-api.com: ' + e.message)
+    try {
+        const r = await fetch('https://api.gold-api.com/price/XAU', { mode: 'cors' })
+        if (r.ok) {
+            const d = await r.json()
+            const p = d?.price ?? d?.ask ?? d?.bid
+            if (p && !isNaN(p)) { goldPrice.value = parseFloat(p); ok = true }
         }
-    }
+    } catch (_) { }
 
     if (!ok && customApiUrl.value?.trim()) {
         try {
             const r = await fetch('https://www.goldapi.io/api/XAU/USD', {
-                headers: { 'x-access-token': customApiUrl.value.trim(), 'Accept': 'application/json' },
+                headers: { 'x-access-token': customApiUrl.value.trim(), Accept: 'application/json' },
                 mode: 'cors'
             })
             if (r.ok) {
                 const d = await r.json()
                 if (d?.price) { goldPrice.value = parseFloat(d.price); ok = true }
-                else errors.push('goldapi.io: unexpected shape — ' + JSON.stringify(d).slice(0, 80))
-            } else {
-                errors.push('goldapi.io: HTTP ' + r.status)
             }
-        } catch (e) {
-            errors.push('goldapi.io: ' + e.message)
-        }
+        } catch (_) { }
     }
 
     if (ok) {
         lastUpdated.value = new Date().toLocaleTimeString()
-        save()
-        flash(t.value.pricesUpdated)
+        save(); flash(t.value.pricesUpdated)
     } else {
-        console.warn('[GoldTracker] fetchPrice failed:', errors)
         const cached = load()?.goldPrice
         if (cached) {
             goldPrice.value = cached
             lastUpdated.value = (load()?.lastUpdated || '') + ' (cached)'
             flash('Using cached price — live fetch failed', 'error')
         } else {
-            flash('Could not fetch price. Try Custom mode or paste a goldapi.io key.', 'error')
+            flash('Could not fetch price. Try Custom mode.', 'error')
         }
     }
     loading.value = false
 }
 
-// ─── Purchases ────────────────────────────────────────────────────────────────
 function addPurchase() {
-    if (!draft.value.weight || !draft.value.price) {
-        flash('Please fill in weight and price', 'error'); return
-    }
+    if (!draft.value.weight || !draft.value.price) { flash('Fill in weight and price', 'error'); return }
     purchases.value.push({ ...draft.value, id: Date.now() })
     draft.value = { weight: '', unit: 'chi', price: '', date: today() }
     showForm.value = false
     save()
 }
 
-function startEdit(i) {
-    editIdx.value = i
-    editDraft.value = { ...purchases.value[i] }
-}
+function startEdit(i) { editIdx.value = i; editDraft.value = { ...purchases.value[i] } }
 
 function saveEdit() {
-    if (!editDraft.value.weight || !editDraft.value.price) {
-        flash('Fill in weight and price', 'error'); return
-    }
+    if (!editDraft.value.weight || !editDraft.value.price) { flash('Fill in weight and price', 'error'); return }
     purchases.value[editIdx.value] = { ...editDraft.value }
-    editIdx.value = null
-    save()
+    editIdx.value = null; save()
 }
 
 function removePurchase(i) {
-    if (confirm('Delete this purchase?')) {
-        purchases.value.splice(i, 1)
-        save()
-    }
+    if (confirm('Delete this purchase?')) { purchases.value.splice(i, 1); save() }
 }
 
 function exportCSV() {
-    const hdr = ['Weight', 'Unit', 'Paid', 'Date']
-    const rows = purchases.value.map(p => [
-        p.weight, p.unit, p.price.toFixed(2), p.date
-    ])
-    const csv = [hdr, ...rows].map(r => r.join(',')).join('\n')
+    const rows = purchases.value.map(p => [p.weight, p.unit, p.price.toFixed(2), p.date])
+    const csv = [['Weight', 'Unit', 'Paid', 'Date'], ...rows].map(r => r.join(',')).join('\n')
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    a.download = `gold-${today()}.csv`
-    a.click()
+    a.download = `gold-${today()}.csv`; a.click()
 }
 
 function importCSV(e) {
-    const file = e.target?.files?.[0]
-    if (!file) return
+    const file = e.target?.files?.[0]; if (!file) return
     const reader = new FileReader()
     reader.onload = (evt) => {
         try {
-            const text = evt.target.result
-            const lines = text.trim().split('\n').map(l => l.trim()).filter(Boolean)
-            if (lines.length < 2) { flash('CSV is empty or has no data rows', 'error'); return }
-
+            const lines = evt.target.result.trim().split('\n').map(l => l.trim()).filter(Boolean)
+            if (lines.length < 2) { flash('CSV empty or no data rows', 'error'); return }
             const hdr = lines[0].split(',').map(h => h.trim().toLowerCase())
-            const wi = hdr.indexOf('weight')
-            const ui = hdr.indexOf('unit')
-            const pi = hdr.indexOf('paid')
-            const di = hdr.indexOf('date')
-
-            if (wi === -1 || pi === -1) {
-                flash('CSV must have "Weight" and "Paid" columns', 'error'); return
-            }
-
+            const wi = hdr.indexOf('weight'), ui = hdr.indexOf('unit'), pi = hdr.indexOf('paid'), di = hdr.indexOf('date')
+            if (wi === -1 || pi === -1) { flash('CSV must have Weight and Paid columns', 'error'); return }
             let added = 0
             for (let i = 1; i < lines.length; i++) {
                 const cols = lines[i].split(',').map(c => c.trim())
-                const weight = parseFloat(cols[wi])
-                const price = parseFloat(cols[pi])
+                const weight = parseFloat(cols[wi]), price = parseFloat(cols[pi])
                 if (isNaN(weight) || isNaN(price)) continue
-
                 const unit = (ui !== -1 && converterUnits.includes(cols[ui])) ? cols[ui] : 'chi'
                 const date = (di !== -1 && cols[di]) ? cols[di] : today()
-
                 purchases.value.push({ weight, unit, price, date, id: Date.now() + i })
                 added++
             }
-
-            if (added > 0) {
-                save()
-                flash(`✓ Imported ${added} purchase${added > 1 ? 's' : ''}`)
-            } else {
-                flash('No valid rows found in CSV', 'error')
-            }
-        } catch {
-            flash('Failed to parse CSV file', 'error')
-        }
+            if (added > 0) { save(); flash(`✓ Imported ${added} purchase${added > 1 ? 's' : ''}`) }
+            else flash('No valid rows found', 'error')
+        } catch { flash('Failed to parse CSV', 'error') }
     }
-    reader.readAsText(file)
-    e.target.value = ''
+    reader.readAsText(file); e.target.value = ''
 }
 
-// ─── Storage ──────────────────────────────────────────────────────────────────
 function save() {
     try {
-        localStorage.setItem('gt3', JSON.stringify({
-            lang: lang.value, isDark: isDark.value,
-            goldPrice: goldPrice.value, lastUpdated: lastUpdated.value,
-            purchases: purchases.value,
+        localStorage.setItem('gt4', JSON.stringify({
+            lang: lang.value, isDark: isDark.value, goldPrice: goldPrice.value,
+            lastUpdated: lastUpdated.value, purchases: purchases.value,
             priceMethod: priceMethod.value, customPrice: customPrice.value,
             customApiUrl: customApiUrl.value, priceSource: priceSource.value,
         }))
     } catch { }
 }
+function load() { try { return JSON.parse(localStorage.getItem('gt4') || 'null') } catch { return null } }
 
-function load() {
-    try { return JSON.parse(localStorage.getItem('gt3') || 'null') } catch { return null }
-}
-
-// ─── Network ──────────────────────────────────────────────────────────────────
 function handleOnline() { isOnline.value = true; fetchPrice() }
 function handleOffline() { isOnline.value = false }
+
+function handleScroll() {
+    // Show sticky price after scrolling past ~100px
+    showStickyPrice.value = window.scrollY > 100
+}
 
 onMounted(() => {
     const d = load()
     if (d) {
-        lang.value = d.lang || 'en'
-        isDark.value = d.isDark || false
-        goldPrice.value = d.goldPrice || null
-        lastUpdated.value = d.lastUpdated || ''
-        purchases.value = d.purchases || []
-        priceMethod.value = d.priceMethod || 'troyOz'
-        customPrice.value = d.customPrice || null
-        customApiUrl.value = d.customApiUrl || ''
+        lang.value = d.lang || 'en'; isDark.value = d.isDark ?? true
+        goldPrice.value = d.goldPrice || null; lastUpdated.value = d.lastUpdated || ''
+        purchases.value = d.purchases || []; priceMethod.value = d.priceMethod || 'troyOz'
+        customPrice.value = d.customPrice || null; customApiUrl.value = d.customApiUrl || ''
         priceSource.value = d.priceSource || 'api'
     }
     if (priceSource.value === 'api') fetchPrice()
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
+    window.addEventListener('scroll', handleScroll, { passive: true })
 })
-
 onBeforeUnmount(() => {
     window.removeEventListener('online', handleOnline)
     window.removeEventListener('offline', handleOffline)
+    window.removeEventListener('scroll', handleScroll)
 })
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
 
 *,
 *::before,
@@ -730,83 +679,64 @@ onBeforeUnmount(() => {
     padding: 0;
 }
 
+/* ── Design Tokens ── */
 :root {
-    --bg: #0a0a0f;
-    --surface: #111118;
-    --surface2: #18181f;
-    --surface3: #1e1e28;
-    --border: rgba(255, 255, 255, 0.08);
-    --border-hi: rgba(255, 200, 60, 0.3);
-    --text: #f0ede8;
-    --text-2: #a09a90;
-    --text-3: #6a6460;
-    --gold: #f5c842;
-    --gold-dim: #c9971a;
-    --gold-glow: rgba(245, 200, 66, 0.15);
-    --gain: #22c55e;
-    --loss: #ef4444;
-    --card-gain-bg: rgba(34, 197, 94, 0.06);
-    --card-loss-bg: rgba(239, 68, 68, 0.06);
-    --radius: 14px;
-    --font-head: 'Plus Jakarta Sans', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-    --btn-primary-bg: #f5c842;
-    --btn-primary-text: #1a1400;
-    --btn-primary-hover: #ffd94a;
-
-    /* Mobile touch target minimum */
-    --touch-min: 44px;
+    --gold: #F5C842;
+    --gold-dim: #C08A10;
+    --gold-alpha: rgba(245, 200, 66, 0.12);
+    --gold-border: rgba(245, 200, 66, 0.28);
+    --gain: #22C55E;
+    --gain-bg: rgba(34, 197, 94, 0.08);
+    --gain-border: rgba(34, 197, 94, 0.35);
+    --loss: #F87171;
+    --loss-bg: rgba(248, 113, 113, 0.08);
+    --loss-border: rgba(248, 113, 113, 0.35);
+    --radius-sm: 10px;
+    --radius: 16px;
+    --radius-lg: 20px;
+    --font: 'Outfit', system-ui, sans-serif;
+    --mono: 'DM Mono', ui-monospace, monospace;
+    --touch: 52px;
 }
 
+/* ── Dark theme (default) ── */
 .app.dark {
-    --bg: #0a0a0f;
-    --surface: #111118;
-    --surface2: #18181f;
-    --surface3: #1e1e28;
-    --border: rgba(255, 255, 255, 0.08);
-    --text: #f4f1ec;
-    --text-2: #b8b0a4;
-    --text-3: #7a7268;
-    --btn-primary-bg: #f5c842;
-    --btn-primary-text: #1a1400;
-    --btn-primary-hover: #ffd94a;
-    --card-gain-bg: rgba(34, 197, 94, 0.08);
-    --card-loss-bg: rgba(239, 68, 68, 0.08);
+    --bg: #0C0C12;
+    --surface: #13131C;
+    --surface2: #1A1A26;
+    --surface3: #222232;
+    --border: rgba(255, 255, 255, 0.07);
+    --border-hi: rgba(255, 255, 255, 0.14);
+    --text: #F2EFE8;
+    --text-2: #9490A0;
+    --text-3: #5A576A;
 }
 
+/* ── Light theme ── */
 .app:not(.dark) {
-    --bg: #f5f2ec;
-    --surface: #ffffff;
-    --surface2: #f8f5ef;
-    --surface3: #ece9e0;
-    --border: rgba(0, 0, 0, 0.1);
-    --border-hi: rgba(180, 130, 0, 0.3);
-    --text: #141210;
-    --text-2: #52504a;
-    --text-3: #888077;
-    --gold-glow: rgba(200, 150, 0, 0.1);
-    --btn-primary-bg: #b8860b;
-    --btn-primary-text: #ffffff;
-    --btn-primary-hover: #d49a0e;
-    --card-gain-bg: rgba(34, 197, 94, 0.1);
-    --card-loss-bg: rgba(239, 68, 68, 0.1);
+    --bg: #F4F1EB;
+    --surface: #FFFFFF;
+    --surface2: #F9F7F2;
+    --surface3: #EEEBDF;
+    --border: rgba(0, 0, 0, 0.08);
+    --border-hi: rgba(0, 0, 0, 0.15);
+    --text: #1A1810;
+    --text-2: #6B665C;
+    --text-3: #A09A8E;
+    --gold: #B8820A;
+    --gold-alpha: rgba(160, 110, 0, 0.1);
+    --gold-border: rgba(160, 110, 0, 0.25);
 }
 
-html,
-body {
-    height: 100%;
-}
-
+/* ── Base ── */
 .app {
     min-height: 100vh;
     background: var(--bg);
     color: var(--text);
-    font-family: var(--font-head);
+    font-family: var(--font);
     font-size: 15px;
-    line-height: 1.6;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    position: relative;
     overflow-x: hidden;
 }
 
@@ -822,49 +752,40 @@ body {
 .orb {
     position: absolute;
     border-radius: 50%;
-    filter: blur(80px);
-    opacity: 0.18;
+    filter: blur(90px);
+    opacity: 0.14;
 }
 
 .orb-1 {
-    width: 500px;
-    height: 500px;
-    background: #f5c842;
-    top: -150px;
-    right: -100px;
-    animation: drift 12s ease-in-out infinite alternate;
+    width: 420px;
+    height: 420px;
+    background: #F5C842;
+    top: -120px;
+    right: -80px;
+    animation: drift 14s ease-in-out infinite alternate;
 }
 
 .orb-2 {
-    width: 350px;
-    height: 350px;
-    background: #a07820;
-    bottom: 30%;
-    left: -80px;
-    animation: drift 16s ease-in-out infinite alternate-reverse;
+    width: 280px;
+    height: 280px;
+    background: #A07020;
+    bottom: 25%;
+    left: -60px;
+    animation: drift 18s ease-in-out infinite alternate-reverse;
 }
 
-.orb-3 {
-    width: 200px;
-    height: 200px;
-    background: #c0902a;
-    bottom: 10%;
-    right: 10%;
-    animation: drift 9s ease-in-out infinite alternate;
+.app:not(.dark) .orb {
+    opacity: 0.08;
 }
 
 @keyframes drift {
     from {
-        transform: translateY(0) scale(1);
+        transform: translate(0, 0) scale(1);
     }
 
     to {
-        transform: translateY(40px) scale(1.1);
+        transform: translate(20px, 30px) scale(1.08);
     }
-}
-
-.app:not(.dark) .orb {
-    opacity: 0.12;
 }
 
 /* ── Header ── */
@@ -872,21 +793,20 @@ body {
     position: sticky;
     top: 0;
     z-index: 100;
-    background: rgba(10, 10, 15, 0.85);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: rgba(12, 12, 18, 0.88);
+    backdrop-filter: blur(24px) saturate(1.4);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
     border-bottom: 1px solid var(--border);
 }
 
 .app:not(.dark) .header {
-    background: rgba(245, 242, 236, 0.92);
+    background: rgba(244, 241, 235, 0.92);
 }
 
 .header-inner {
-    max-width: 900px;
+    max-width: 640px;
     margin: 0 auto;
-    /* Vertical padding scales down on small screens */
-    padding: 12px 16px;
+    padding: 10px 16px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -895,42 +815,38 @@ body {
 
 .logo {
     display: flex;
-    gap: 10px;
     align-items: center;
+    gap: 10px;
     min-width: 0;
-    /* allow text truncation */
 }
 
-.logo-icon {
-    font-size: 24px;
+.logo-gem {
+    font-size: 22px;
     color: var(--gold);
-    line-height: 1;
     flex-shrink: 0;
+    line-height: 1;
 }
 
-.logo>div {
+.logo-text {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
 }
 
 .logo-title {
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 800;
     letter-spacing: -0.3px;
-    line-height: 1.2;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .logo-sub {
-    font-size: 11px;
-    color: var(--text-2);
-    font-family: var(--font-mono);
-    letter-spacing: 0.02em;
+    font-size: 10px;
+    color: var(--text-3);
+    letter-spacing: 0.05em;
     margin-top: 1px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .header-controls {
@@ -943,15 +859,12 @@ body {
     background: var(--surface2);
     border: 1px solid var(--border);
     color: var(--text);
-    padding: 0 14px;
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     font-size: 14px;
-    font-family: var(--font-head);
     cursor: pointer;
-    transition: all 0.2s;
-    /* Guaranteed touch target */
-    min-height: var(--touch-min);
-    min-width: var(--touch-min);
+    transition: border-color 0.2s, color 0.2s;
+    min-height: var(--touch);
+    min-width: var(--touch);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -962,43 +875,100 @@ body {
     color: var(--gold);
 }
 
-.ctrl-btn.lang {
+.lang-btn {
     font-size: 12px;
+    padding: 0 12px;
+    min-width: unset;
 }
 
 .offline-bar {
     text-align: center;
-    padding: 8px 16px;
-    font-size: 13px;
-    background: rgba(245, 200, 66, 0.15);
-    color: var(--gold);
-    border-top: 1px solid var(--border-hi);
-    font-family: var(--font-head);
+    padding: 8px;
+    font-size: 12px;
     font-weight: 600;
+    background: var(--gold-alpha);
+    color: var(--gold);
+    border-top: 1px solid var(--gold-border);
+}
+
+/* ── Sticky Price ── */
+.sticky-price {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%) translateY(-56px);
+    z-index: 99;
+    background: var(--surface);
+    border: 1px solid var(--gold-border);
+    border-radius: 0 0 12px 12px;
+    padding: 6px 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.sticky-price.visible {
+    transform: translateX(-50%) translateY(0);
+}
+
+.sticky-gem {
+    font-size: 12px;
+    color: var(--gold);
+}
+
+.sticky-val {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--gold);
+    font-family: var(--mono);
+}
+
+.sticky-unit {
+    font-size: 11px;
+    color: var(--text-3);
+}
+
+.sticky-refresh {
+    background: none;
+    border: none;
+    color: var(--text-2);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+    margin-left: 4px;
+    transition: color 0.2s;
+    min-height: unset;
+}
+
+.sticky-refresh:hover {
+    color: var(--gold);
 }
 
 /* ── Main ── */
 .main {
     position: relative;
     z-index: 1;
-    max-width: 900px;
+    max-width: 640px;
     margin: 0 auto;
-    padding: 16px 12px 56px;
+    padding: 12px 12px 72px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
-/* ── Price Hero ── */
-.price-hero {
+/* ── Cards ── */
+.card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 20px 16px;
-    margin-bottom: 16px;
+    border-radius: var(--radius-lg);
+    padding: 18px 16px;
     position: relative;
     overflow: hidden;
 }
 
-.price-hero::before {
-    content: '';
+.card-accent {
     position: absolute;
     top: 0;
     left: 0;
@@ -1007,205 +977,209 @@ body {
     background: linear-gradient(90deg, transparent, var(--gold), transparent);
 }
 
-.price-tabs {
+/* ── Segmented Control ── */
+.seg-ctrl {
     display: flex;
-    gap: 6px;
-    margin-bottom: 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 3px;
+    margin-bottom: 18px;
+    gap: 3px;
 }
 
-.ptab {
+.seg-btn {
     flex: 1;
-    padding: 0 10px;
+    padding: 12px 12px;
     border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--surface2);
+    border: none;
+    background: transparent;
     color: var(--text-2);
-    font-family: var(--font-head);
-    font-size: 13px;
+    font-family: var(--font);
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    min-height: var(--touch-min);
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
-.ptab.active {
-    background: var(--gold-glow);
-    border-color: var(--border-hi);
+.seg-btn.active {
+    background: var(--gold-alpha);
     color: var(--gold);
+    border: 1px solid var(--gold-border);
 }
 
-.gold-display {
-    margin-bottom: 16px;
+/* ── Hero Price ── */
+.hero-price-block {
+    margin-bottom: 14px;
 }
 
-.gold-meta {
+.hero-meta-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 6px;
-    flex-wrap: wrap;
-    gap: 4px;
+    margin-bottom: 4px;
 }
 
-.metal-label {
-    font-size: 13px;
+.metal-tag {
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-2);
     letter-spacing: 0.04em;
 }
 
-.update-time {
+.last-updated {
     font-size: 11px;
     color: var(--text-3);
-    font-family: var(--font-mono);
+    font-family: var(--mono);
 }
 
-.gold-price-row {
+.hero-price {
     display: flex;
     align-items: baseline;
-    gap: 8px;
-    margin-bottom: 14px;
-    flex-wrap: wrap;
+    gap: 2px;
+    line-height: 1;
+    margin-bottom: 4px;
 }
 
-.gold-price-value {
-    /* Fluid font: 36px → 68px */
-    font-size: clamp(36px, 10vw, 68px);
+.price-dollar {
+    font-size: 28px;
     font-weight: 800;
     color: var(--gold);
-    line-height: 1;
+    align-self: flex-start;
+    margin-top: 4px;
+}
+
+.price-int {
+    font-size: clamp(44px, 12vw, 72px);
+    font-weight: 800;
+    color: var(--gold);
+    letter-spacing: -2px;
     font-variant-numeric: tabular-nums;
-    letter-spacing: -1px;
 }
 
-.gold-price-unit {
-    font-size: 13px;
+.price-dec {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--gold-dim);
+    letter-spacing: 0;
+}
+
+.price-unit-label {
+    font-size: 12px;
     color: var(--text-3);
-    font-family: var(--font-mono);
+    font-family: var(--mono);
 }
 
-/* Horizontally scrollable strip on mobile */
-.price-strip-wrap {
+/* ── Chips ── */
+.chips-scroll {
+    display: flex;
+    gap: 6px;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    padding: 2px 0 10px;
     margin: 0 -4px;
-    padding: 0 4px;
+    padding-left: 4px;
 }
 
-.price-strip-wrap::-webkit-scrollbar {
+.chips-scroll::-webkit-scrollbar {
     display: none;
 }
 
-.price-strip {
-    display: flex;
-    gap: 6px;
-    /* Don't wrap — scroll instead */
-    min-width: max-content;
-}
-
-.strip-item {
+.chip {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
+    flex-shrink: 0;
     background: var(--surface2);
     border: 1px solid var(--border);
-    padding: 10px 12px;
-    border-radius: 8px;
-    /* Fixed width so all 6 chips look uniform */
-    min-width: 72px;
-    flex-shrink: 0;
+    border-radius: 10px;
+    padding: 8px 10px;
+    min-width: 64px;
 }
 
-.strip-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-2);
+.chip-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-3);
     text-transform: uppercase;
     letter-spacing: 0.06em;
 }
 
-.strip-val {
-    font-size: 13px;
+.chip-price {
+    font-size: 12px;
     font-weight: 600;
     color: var(--text);
-    font-family: var(--font-mono);
+    font-family: var(--mono);
 }
 
-/* ── Load Bar ── */
-.load-bar {
+/* ── Progress Bar ── */
+.progress-bar {
     height: 3px;
     background: var(--surface3);
     border-radius: 2px;
     overflow: hidden;
-    margin: 12px 0;
+    margin: 10px 0;
 }
 
-.load-fill {
+.progress-fill {
     height: 100%;
     background: var(--gold);
-    animation: loadAnim 1.5s ease-in-out infinite;
+    animation: progress 1.4s ease-in-out infinite;
 }
 
-@keyframes loadAnim {
+@keyframes progress {
     0% {
-        width: 0;
-        margin-left: 0;
+        transform: translateX(-100%) scaleX(0.4);
     }
 
     50% {
-        width: 60%;
-        margin-left: 20%;
+        transform: translateX(60%) scaleX(0.8);
     }
 
     100% {
-        width: 0;
-        margin-left: 100%;
+        transform: translateX(200%) scaleX(0.4);
     }
 }
 
 /* ── Flash ── */
 .flash {
     padding: 10px 14px;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 13px;
-    font-family: var(--font-head);
     font-weight: 500;
-    margin-top: 12px;
+    margin-top: 10px;
 }
 
 .flash.success {
     background: rgba(34, 197, 94, 0.1);
     border: 1px solid rgba(34, 197, 94, 0.3);
-    color: #22c55e;
+    color: var(--gain);
 }
 
 .flash.error {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    color: #ef4444;
+    background: rgba(248, 113, 113, 0.1);
+    border: 1px solid rgba(248, 113, 113, 0.3);
+    color: var(--loss);
 }
 
-/* ── API Panel ── */
-.api-panel {
-    margin-top: 16px;
-    padding-top: 16px;
+/* ── Sub Panels ── */
+.sub-panel {
+    margin-top: 14px;
+    padding-top: 14px;
     border-top: 1px solid var(--border);
 }
 
-.api-panel-row {
+.sub-panel-row {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     gap: 10px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
     flex-wrap: wrap;
 }
 
-.api-panel-info {
+.api-info {
     display: flex;
     flex-direction: column;
     gap: 3px;
@@ -1214,68 +1188,21 @@ body {
 }
 
 .api-badge {
-    font-size: 11px;
-    font-family: var(--font-head);
-    font-weight: 700;
-    background: var(--gold-glow);
-    border: 1px solid var(--border-hi);
-    color: var(--gold);
-    padding: 3px 8px;
-    border-radius: 4px;
     display: inline-block;
     width: fit-content;
-}
-
-.api-desc {
-    font-size: 12px;
-    color: var(--text-2);
-    font-weight: 500;
-}
-
-.refresh-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    background: var(--btn-primary-bg);
-    color: var(--btn-primary-text);
-    border: none;
-    border-radius: 8px;
-    padding: 0 18px;
-    font-size: 13px;
+    font-size: 10px;
     font-weight: 700;
-    font-family: var(--font-head);
-    cursor: pointer;
-    transition: all 0.2s;
-    min-height: var(--touch-min);
-    white-space: nowrap;
-    /* Full width when wrapped on very small screens */
-    flex-shrink: 0;
+    letter-spacing: 0.05em;
+    background: var(--gold-alpha);
+    border: 1px solid var(--gold-border);
+    color: var(--gold);
+    padding: 3px 8px;
+    border-radius: 6px;
 }
 
-.refresh-btn:hover:not(:disabled) {
-    background: var(--btn-primary-hover);
-    transform: translateY(-1px);
-}
-
-.refresh-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.spin-icon {
-    display: inline-block;
-    transition: transform 0.3s;
-}
-
-.spin-icon.spinning {
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+.api-hint-text {
+    font-size: 12px;
+    color: var(--text-3);
 }
 
 .api-key-row {
@@ -1284,57 +1211,9 @@ body {
     margin-bottom: 8px;
 }
 
-.api-input {
-    flex: 1;
-    min-width: 0;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size: 13px;
-    padding: 0 12px;
-    transition: border 0.2s;
-    min-height: var(--touch-min);
-}
-
-.api-input:focus {
-    outline: none;
-    border-color: var(--border-hi);
-}
-
-.paste-btn,
-.clear-btn {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text-2);
-    border-radius: 8px;
-    padding: 0 12px;
-    font-size: 16px;
-    cursor: pointer;
-    min-height: var(--touch-min);
-    min-width: var(--touch-min);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-    flex-shrink: 0;
-}
-
-.paste-btn:hover {
-    border-color: var(--border-hi);
-}
-
-.clear-btn:hover {
-    color: var(--loss);
-    border-color: rgba(239, 68, 68, 0.3);
-}
-
 .api-hint {
     font-size: 12px;
-    font-weight: 500;
     color: var(--text-3);
-    font-family: var(--font-head);
     line-height: 1.5;
 }
 
@@ -1347,249 +1226,280 @@ body {
     text-decoration: underline;
 }
 
-/* ── Custom Panel ── */
-.custom-panel {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid var(--border);
-}
-
+/* ── Method Tabs ── */
 .method-tabs {
     display: flex;
     gap: 6px;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
 }
 
-.mtab {
+.method-btn {
     flex: 1;
-    padding: 0 8px;
-    border-radius: 8px;
+    padding: 10px 8px;
     border: 1px solid var(--border);
+    border-radius: 8px;
     background: var(--surface2);
     color: var(--text-2);
-    font-family: var(--font-head);
+    font-family: var(--font);
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    min-height: var(--touch-min);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
 }
 
-.mtab.active {
-    background: var(--gold-glow);
-    border-color: var(--border-hi);
+.method-btn.active {
+    background: var(--gold-alpha);
+    border-color: var(--gold-border);
     color: var(--gold);
 }
 
-.custom-input-row {
+.price-input-row {
     display: flex;
-    align-items: stretch;
-    margin-bottom: 14px;
 }
 
 .input-prefix {
     background: var(--surface3);
     border: 1px solid var(--border);
     border-right: none;
-    border-radius: 8px 0 0 8px;
-    padding: 0 14px;
-    font-size: 18px;
+    border-radius: 10px 0 0 10px;
+    padding: 14px 14px;
+    font-size: 20px;
     color: var(--gold);
-    font-family: var(--font-mono);
-    line-height: 1;
+    font-family: var(--mono);
     display: flex;
     align-items: center;
-    min-height: var(--touch-min);
     flex-shrink: 0;
 }
 
-.custom-price-input {
-    flex: 1;
-    min-width: 0;
+.price-input {
+    border-radius: 0 10px 10px 0 !important;
+}
+
+/* ── Shared Inputs ── */
+.text-input {
     background: var(--surface2);
     border: 1px solid var(--border);
-    border-left: none;
-    border-radius: 0 8px 8px 0;
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size: 18px;
-    padding: 0 14px;
-    min-height: var(--touch-min);
-    transition: border 0.2s;
-}
-
-.custom-price-input:focus {
-    outline: none;
-    border-color: var(--border-hi);
-}
-
-.custom-preview {
-    background: var(--surface2);
     border-radius: 10px;
-    border: 1px solid var(--border);
-    overflow: hidden;
-}
-
-.prev-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 11px 14px;
-    border-bottom: 1px solid var(--border);
-}
-
-.prev-row:last-child {
-    border-bottom: none;
-}
-
-.prev-row span:first-child {
-    color: var(--text-2);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 15px;
     font-weight: 500;
-    font-family: var(--font-head);
-    font-size: 14px;
+    padding: 14px 14px;
+    width: 100%;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
-.prev-row span:last-child {
-    color: var(--text);
-    font-weight: 600;
-    font-family: var(--font-mono);
+.text-input:focus {
+    outline: none;
+    border-color: var(--gold-border);
 }
 
-/* ── Sections ── */
-.section {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 18px 14px 22px;
-    margin-bottom: 16px;
+.text-input::placeholder {
+    color: var(--text-3);
 }
 
-.section-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 16px;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.header-actions {
-    display: flex;
-    gap: 6px;
+/* ── Buttons ── */
+.primary-btn {
+    display: inline-flex;
     align-items: center;
-    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    background: var(--gold);
+    color: #1A1000;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 22px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
 }
 
-.section-title {
-    font-size: 16px;
-    font-weight: 700;
-    letter-spacing: -0.2px;
+.primary-btn:hover:not(:disabled) {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+}
+
+.primary-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.app:not(.dark) .primary-btn {
+    color: #fff;
+    background: var(--gold-dim);
+}
+
+.refresh-btn {
+    flex-shrink: 0;
+    padding: 14px 20px;
+}
+
+.full-btn {
+    width: 100%;
+}
+
+.ghost-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    border-radius: 12px;
+    padding: 14px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ghost-btn:hover {
+    border-color: var(--border-hi);
     color: var(--text);
-    line-height: 1.3;
-    /* Prevent wrapping inside section-header */
-    white-space: nowrap;
+}
+
+.icon-btn-sm {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    border-radius: 10px;
+    font-size: 16px;
+    cursor: pointer;
+    min-height: var(--touch);
+    min-width: var(--touch);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.icon-btn-sm:hover {
+    border-color: var(--gold-border);
+}
+
+.icon-btn-sm.danger:hover {
+    border-color: var(--loss-border);
+}
+
+.spin {
+    display: inline-block;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ── Section ── */
+.section-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--text);
+    margin-bottom: 14px;
 }
 
 .section-title::before {
     content: '◈ ';
     color: var(--gold);
-    font-size: 11px;
+    font-size: 10px;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.section-header .section-title {
+    margin-bottom: 0;
+}
+
+.section-actions {
+    display: flex;
+    gap: 6px;
 }
 
 /* ── Converter ── */
-.conv-tabs {
+.conv-tabs-scroll {
     display: flex;
     gap: 5px;
-    margin-bottom: 14px;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     padding-bottom: 2px;
+    margin-bottom: 12px;
 }
 
-.conv-tabs::-webkit-scrollbar {
+.conv-tabs-scroll::-webkit-scrollbar {
     display: none;
 }
 
-.ctab {
-    padding: 0 12px;
-    border-radius: 7px;
+.conv-tab {
+    padding: 10px 14px;
     border: 1px solid var(--border);
     background: var(--surface2);
     color: var(--text-2);
-    font-family: var(--font-head);
+    font-family: var(--font);
     font-size: 13px;
     font-weight: 600;
+    border-radius: 8px;
     white-space: nowrap;
     cursor: pointer;
     transition: all 0.2s;
-    min-height: 38px;
     flex-shrink: 0;
-    display: inline-flex;
-    align-items: center;
 }
 
-.ctab.active {
-    background: var(--gold-glow);
-    border-color: var(--border-hi);
+.conv-tab.active {
+    background: var(--gold-alpha);
+    border-color: var(--gold-border);
     color: var(--gold);
 }
 
-.conv-body {
+.conv-input-row {
     display: flex;
-    flex-direction: column;
-    gap: 14px;
+    gap: 0;
+    margin-bottom: 10px;
 }
 
-.conv-input-wrap {
-    display: flex;
-    align-items: stretch;
-}
-
-.conv-unit-badge {
-    background: var(--gold-glow);
-    border: 1px solid var(--border-hi);
+.from-badge {
+    background: var(--gold-alpha);
+    border: 1px solid var(--gold-border);
     border-right: none;
-    border-radius: 8px 0 0 8px;
-    padding: 0 12px;
+    border-radius: 10px 0 0 10px;
+    padding: 14px 14px;
     color: var(--gold);
-    font-family: var(--font-head);
     font-size: 13px;
     font-weight: 700;
     display: flex;
     align-items: center;
     white-space: nowrap;
-    min-height: var(--touch-min);
     flex-shrink: 0;
 }
 
 .conv-input {
-    flex: 1;
-    min-width: 0;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-left: none;
-    border-radius: 0 8px 8px 0;
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size: 18px;
-    padding: 0 14px;
-    min-height: var(--touch-min);
-}
-
-.conv-input:focus {
-    outline: none;
-    border-color: var(--border-hi);
+    border-radius: 0 10px 10px 0 !important;
+    font-size: 18px !important;
+    font-family: var(--mono) !important;
 }
 
 .conv-results {
     background: var(--surface2);
-    border-radius: 10px;
     border: 1px solid var(--border);
+    border-radius: 12px;
     overflow: hidden;
 }
 
@@ -1597,7 +1507,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 11px 14px;
+    padding: 12px 14px;
     border-bottom: 1px solid var(--border);
     gap: 8px;
 }
@@ -1608,22 +1518,18 @@ body {
 
 .conv-label {
     font-size: 14px;
-    font-family: var(--font-head);
     color: var(--text-2);
     font-weight: 500;
-    flex-shrink: 0;
 }
 
 .conv-val {
     font-size: 14px;
-    font-family: var(--font-mono);
-    color: var(--text);
+    font-family: var(--mono);
     font-weight: 600;
-    word-break: break-all;
-    text-align: right;
+    color: var(--text);
 }
 
-/* ── Unit Grid — 3 cols mobile, 6 cols wide ── */
+/* ── Unit Grid ── */
 .unit-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1633,296 +1539,257 @@ body {
 .unit-tile {
     background: var(--surface2);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 12px 10px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
     transition: border-color 0.2s;
-    min-height: 76px;
 }
 
 .unit-tile:hover {
-    border-color: var(--border-hi);
+    border-color: var(--gold-border);
+}
+
+.tile-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .tile-name {
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-2);
     text-transform: uppercase;
     letter-spacing: 0.06em;
 }
 
+.tile-gram {
+    font-size: 10px;
+    color: var(--text-3);
+    font-family: var(--mono);
+}
+
 .tile-price {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
     color: var(--text);
+    font-family: var(--mono);
     font-variant-numeric: tabular-nums;
-    line-height: 1.2;
-    /* Prevent overflow on very small tiles */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.tile-gram {
-    font-size: 11px;
-    color: var(--text-3);
-    font-family: var(--font-mono);
-    margin-top: auto;
-}
-
-/* ── Purchases ── */
-.add-btn {
+/* ── Add Button ── */
+.add-purchase-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
     background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 0 14px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-family: var(--font-head);
+    border: 1.5px dashed var(--border-hi);
+    border-radius: 14px;
+    color: var(--text-2);
+    font-family: var(--font);
+    font-size: 15px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    min-height: var(--touch-min);
-    white-space: nowrap;
-    display: inline-flex;
-    align-items: center;
+    padding: 16px 20px;
+    margin-bottom: 12px;
 }
 
-.add-btn:hover {
-    border-color: var(--gold);
+.add-purchase-btn:hover {
+    border-color: var(--gold-border);
     color: var(--gold);
+    background: var(--gold-alpha);
 }
 
+.add-icon {
+    font-size: 22px;
+    line-height: 1;
+}
+
+/* ── Purchase Form ── */
 .purchase-form {
     background: var(--surface2);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px 14px;
-    margin-bottom: 16px;
-    width: 100%;
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 12px;
 }
 
 .form-grid {
     display: grid;
-    /* 2 cols on mobile, auto-fill on larger */
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
     margin-bottom: 12px;
 }
 
-.fg {
+.form-field {
     display: flex;
     flex-direction: column;
     gap: 5px;
 }
 
-.fg label {
+.form-field label {
     font-size: 11px;
-    font-family: var(--font-head);
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-2);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.07em;
 }
 
-.fg input,
-.fg select {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    font-family: var(--font-head);
-    font-size: 15px;
-    font-weight: 500;
-    padding: 0 12px;
-    min-height: var(--touch-min);
-    transition: border 0.2s;
-    -webkit-appearance: none;
-    width: 100%;
-}
-
-.fg input:focus,
-.fg select:focus {
-    outline: none;
-    border-color: var(--border-hi);
-}
-
-.submit-btn {
-    width: 100%;
-    background: var(--btn-primary-bg);
-    color: var(--btn-primary-text);
-    border: none;
-    border-radius: 8px;
-    padding: 0 12px;
-    font-size: 14px;
-    font-weight: 700;
-    font-family: var(--font-head);
-    cursor: pointer;
-    transition: all 0.2s;
-    min-height: var(--touch-min);
+/* ── Purchase Cards ── */
+.purchases-list {
     display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.submit-btn:hover {
-    background: var(--btn-primary-hover);
-    transform: translateY(-1px);
-}
-
-/* Purchases grid — single col on mobile, multi on wider */
-.purchases-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 10px;
-    margin-top: 14px;
-    margin-bottom: 16px;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
 }
 
 .p-card {
     background: var(--surface2);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 14px;
     padding: 14px;
-    transition: border-color 0.2s;
+    transition: all 0.2s;
 }
 
-.p-card:hover {
-    border-color: var(--border-hi);
+.p-card.gain {
+    border-color: var(--gain-border);
+    background: var(--gain-bg);
+    border-left: 3px solid var(--gain);
 }
 
-.pcard-top {
+.p-card.loss {
+    border-color: var(--loss-border);
+    background: var(--loss-bg);
+    border-left: 3px solid var(--loss);
+}
+
+.pcard-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     margin-bottom: 12px;
     gap: 8px;
 }
 
-.pcard-weight {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--text);
-    line-height: 1.3;
+.pcard-weight-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
-.pcard-actions {
+.pcard-weight {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+}
+
+.pcard-unit {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-2);
+}
+
+.pcard-date {
+    font-size: 11px;
+    color: var(--text-3);
+    font-family: var(--mono);
+}
+
+.pcard-btns {
     display: flex;
     gap: 6px;
     flex-shrink: 0;
 }
 
-.icon-btn {
+.pcard-btn {
     background: var(--surface3);
     border: 1px solid var(--border);
     color: var(--text-2);
-    border-radius: 6px;
-    font-size: 15px;
+    border-radius: 8px;
+    font-size: 14px;
     cursor: pointer;
-    min-height: var(--touch-min);
-    min-width: var(--touch-min);
+    min-height: 40px;
+    min-width: 40px;
     transition: all 0.2s;
     display: inline-flex;
     align-items: center;
     justify-content: center;
 }
 
-.icon-btn:hover {
-    border-color: var(--gold);
+.pcard-btn:hover {
+    border-color: var(--gold-border);
     color: var(--gold);
 }
 
-.icon-btn.danger:hover {
-    border-color: rgba(239, 68, 68, 0.4);
+.pcard-btn.danger:hover {
+    border-color: var(--loss-border);
     color: var(--loss);
 }
 
-.pcard-rows {
+/* GL Row — 3-column layout */
+.gl-row {
+    display: flex;
+    align-items: stretch;
+}
+
+.gl-col {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    margin-bottom: 4px;
+    gap: 3px;
+    padding: 0 4px;
 }
 
-.pcard-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 7px 0;
-    border-bottom: 1px solid var(--border);
-    gap: 8px;
+.gl-col:first-child {
+    padding-left: 0;
 }
 
-.pcard-row:last-child {
-    border: none;
+.gl-col:last-child {
+    padding-right: 0;
 }
 
-.pcard-row span:first-child {
-    color: var(--text-2);
-    font-size: 13px;
-    font-family: var(--font-head);
-    font-weight: 500;
+.gl-divider {
+    width: 1px;
+    background: var(--border);
     flex-shrink: 0;
+    margin: 0 4px;
 }
 
-.pcard-row span:last-child {
-    color: var(--text);
-    font-size: 14px;
-    font-family: var(--font-mono);
+.gl-label {
+    font-size: 11px;
     font-weight: 600;
-    text-align: right;
-}
-
-.pcard-row.highlight.gain {
-    background: rgba(34, 197, 94, 0.08);
-    border-radius: 6px;
-    padding: 8px 10px;
-    margin: 4px -10px 0;
-}
-
-.pcard-row.highlight.loss {
-    background: rgba(239, 68, 68, 0.08);
-    border-radius: 6px;
-    padding: 8px 10px;
-    margin: 4px -10px 0;
-}
-
-.pcard-row.highlight.gain span:last-child {
-    color: var(--gain) !important;
-    font-weight: 700;
-    font-size: 15px;
-}
-
-.pcard-row.highlight.loss span:last-child {
-    color: var(--loss) !important;
-    font-weight: 700;
-    font-size: 15px;
-}
-
-.pcard-row.highlight.gain span:first-child {
-    color: var(--gain);
-    font-weight: 600;
-}
-
-.pcard-row.highlight.loss span:first-child {
-    color: var(--loss);
-    font-weight: 600;
-}
-
-.pcard-date {
-    font-size: 10px;
     color: var(--text-3);
-    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
-.edit-form .form-grid {
-    margin-bottom: 10px;
+.gl-val {
+    font-size: 13px;
+    font-weight: 700;
+    font-family: var(--mono);
+    color: var(--text);
+}
+
+.gl-val.gain {
+    color: var(--gain);
+}
+
+.gl-val.loss {
+    color: var(--loss);
+}
+
+.gl-main {
+    font-size: 14px;
 }
 
 .edit-actions {
@@ -1930,56 +1797,19 @@ body {
     gap: 8px;
 }
 
-.edit-actions .submit-btn {
-    flex: 1;
-}
-
-.cancel-edit-btn {
-    flex: 1;
-    background: var(--surface3);
-    border: 1px solid var(--border);
-    color: var(--text-2);
-    border-radius: 8px;
-    padding: 0 12px;
-    font-size: 14px;
-    font-family: var(--font-head);
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    min-height: var(--touch-min);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.cancel-edit-btn:hover {
-    border-color: var(--loss);
-    color: var(--loss);
-}
-
 /* ── Summary ── */
 .summary {
     background: var(--surface2);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px 14px;
+    border-radius: 14px;
+    padding: 14px;
 }
 
-.summary h3 {
-    font-size: 12px;
-    font-weight: 700;
-    margin-bottom: 12px;
-    color: var(--text-2);
-    font-family: var(--font-head);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-
-.summary-grid {
+.sum-row {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 8px;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .sum-item {
@@ -1989,127 +1819,86 @@ body {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 12px 10px;
-    min-width: 0;
+    padding: 10px 10px;
+}
+
+.sum-item.gain {
+    background: var(--gain-bg);
+    border-color: var(--gain-border);
+    border-left: 3px solid var(--gain);
+}
+
+.sum-item.loss {
+    background: var(--loss-bg);
+    border-color: var(--loss-border);
+    border-left: 3px solid var(--loss);
 }
 
 .sum-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-2);
-    font-family: var(--font-head);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-3);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 .sum-val {
-    font-size: clamp(14px, 3.5vw, 18px);
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
+    font-size: clamp(12px, 3.5vw, 16px);
+    font-weight: 800;
     color: var(--text);
-    line-height: 1.3;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.sum-item.gain {
-    background: var(--card-gain-bg);
-    border-color: rgba(34, 197, 94, 0.4);
-    border-left: 3px solid var(--gain);
-}
-
 .sum-item.gain .sum-val {
-    color: var(--gain) !important;
-}
-
-.sum-item.gain .sum-label {
     color: var(--gain);
-    opacity: 0.8;
-}
-
-.sum-item.loss {
-    background: var(--card-loss-bg);
-    border-color: rgba(239, 68, 68, 0.4);
-    border-left: 3px solid var(--loss);
 }
 
 .sum-item.loss .sum-val {
-    color: var(--loss) !important;
-}
-
-.sum-item.loss .sum-label {
     color: var(--loss);
-    opacity: 0.8;
 }
 
-/* ── IO row ── */
-.io-row {
-    display: flex;
-    gap: 4px;
+.portfolio-bar {
+    height: 4px;
+    background: var(--surface3);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 6px;
 }
 
-.io-btn {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    color: var(--text-2);
-    border-radius: 8px;
-    padding: 0 10px;
+.portfolio-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s ease;
+}
+
+.portfolio-fill.gain {
+    background: var(--gain);
+}
+
+.portfolio-fill.loss {
+    background: var(--loss);
+}
+
+.portfolio-pct {
     font-size: 12px;
-    font-weight: 600;
-    font-family: var(--font-head);
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-    min-height: var(--touch-min);
-    display: inline-flex;
-    align-items: center;
+    font-weight: 700;
+    text-align: right;
+    font-family: var(--mono);
 }
 
-.io-btn.export:hover {
-    border-color: var(--gold);
-    color: var(--gold);
-}
-
-.io-btn.import:hover {
-    border-color: var(--gain);
+.portfolio-pct.gain {
     color: var(--gain);
 }
 
-/* ── Card gain/loss accent ── */
-.p-card.gain {
-    border-color: rgba(34, 197, 94, 0.5);
-    border-left: 3px solid var(--gain);
-    background: var(--card-gain-bg);
-}
-
-.p-card.loss {
-    border-color: rgba(239, 68, 68, 0.5);
-    border-left: 3px solid var(--loss);
-    background: var(--card-loss-bg);
-}
-
-.p-card.gain:hover {
-    border-color: rgba(34, 197, 94, 0.7);
-    box-shadow: 0 0 12px rgba(34, 197, 94, 0.12);
-}
-
-.p-card.loss:hover {
-    border-color: rgba(239, 68, 68, 0.7);
-    box-shadow: 0 0 12px rgba(239, 68, 68, 0.12);
-}
-
-.current-val.gain {
-    color: var(--gain) !important;
-    font-weight: 700;
-}
-
-.current-val.loss {
-    color: var(--loss) !important;
-    font-weight: 700;
+.portfolio-pct.loss {
+    color: var(--loss);
 }
 
 /* ── Empty State ── */
@@ -2118,21 +1907,20 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    padding: 36px 20px;
+    padding: 32px 20px;
     background: var(--surface2);
     border-radius: 12px;
-    border: 1px dashed var(--border);
+    border: 1.5px dashed var(--border);
 }
 
 .empty-icon {
-    font-size: 28px;
+    font-size: 24px;
     color: var(--text-3);
 }
 
 .empty-state p {
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text-2);
-    font-family: var(--font-head);
     font-weight: 500;
     text-align: center;
 }
@@ -2141,9 +1929,8 @@ body {
 .footer {
     text-align: center;
     padding: 20px 16px;
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-3);
-    font-family: var(--font-head);
     font-weight: 500;
     border-top: 1px solid var(--border);
 }
@@ -2151,17 +1938,17 @@ body {
 /* ── Transitions ── */
 .price-flip-enter-active,
 .price-flip-leave-active {
-    transition: all 0.3s ease;
+    transition: all 0.25s ease;
 }
 
 .price-flip-enter-from {
     opacity: 0;
-    transform: translateY(-12px);
+    transform: translateY(-8px);
 }
 
 .price-flip-leave-to {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(8px);
 }
 
 .fade-enter-active,
@@ -2183,92 +1970,62 @@ body {
 .slide-down-enter-from,
 .slide-down-leave-to {
     opacity: 0;
-    transform: translateY(-12px);
+    transform: translateY(-10px);
     max-height: 0;
 }
 
 .slide-down-enter-to,
 .slide-down-leave-from {
-    max-height: 600px;
+    max-height: 700px;
 }
 
-/* ── Responsive: 480px – tablets ── */
+/* ── Responsive ── */
 @media (min-width: 480px) {
-    .header-inner {
-        padding: 14px 20px;
-    }
-
-    .logo-title {
-        font-size: 20px;
-    }
-
     .main {
-        padding: 20px 16px 56px;
+        padding: 16px 16px 72px;
     }
 
-    .price-hero {
-        padding: 24px 20px;
+    .unit-grid {
+        grid-template-columns: repeat(6, 1fr);
     }
 
-    .section {
-        padding: 20px 18px 24px;
-    }
-
-    .purchases-grid {
-        grid-template-columns: repeat(2, 1fr);
+    .chips-scroll {
+        overflow: visible;
+        flex-wrap: wrap;
     }
 
     .form-grid {
         grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
     }
 
-    .unit-grid {
+    .purchases-list {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .summary .sum-row {
         grid-template-columns: repeat(3, 1fr);
     }
 }
 
-/* ── Responsive: 640px+ ── */
 @media (min-width: 640px) {
-    .unit-grid {
-        grid-template-columns: repeat(6, 1fr);
+    .card {
+        padding: 22px 20px;
     }
 
-    /* Price strip fits without scroll on wide screens */
-    .price-strip-wrap {
-        overflow: visible;
-    }
-
-    .price-strip {
-        display: grid;
-        grid-template-columns: repeat(6, 1fr);
-        min-width: unset;
-    }
-
-    .strip-item {
-        min-width: unset;
-    }
-
-    .purchases-grid {
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    .header-inner {
+        padding: 12px 20px;
     }
 }
 
-/* ── Responsive: 768px+ ── */
-@media (min-width: 768px) {
-    .price-hero {
-        padding: 28px 28px;
-    }
-
-    .section {
-        padding: 24px 24px 28px;
-    }
-
+/* ── Safe area (iPhone notch/home bar) ── */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
     .main {
-        padding: 24px 16px 48px;
+        padding-bottom: calc(72px + env(safe-area-inset-bottom));
     }
 
-    .logo-title {
-        font-size: 20px;
+    .header {
+        padding-top: env(safe-area-inset-top);
     }
 }
 </style>
