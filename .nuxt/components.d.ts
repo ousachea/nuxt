@@ -14,7 +14,6 @@ type HydrationStrategies = {
 type LazyComponent<T> = DefineComponent<HydrationStrategies, {}, {}, {}, {}, {}, {}, { hydrated: () => void }> & T
 
 
-export const AppNav: typeof import("../components/AppNav.vue")['default']
 export const NuxtWelcome: typeof import("../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/app/components/welcome.vue")['default']
 export const NuxtLayout: typeof import("../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/app/components/nuxt-layout")['default']
 export const NuxtErrorBoundary: typeof import("../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/app/components/nuxt-error-boundary.vue")['default']
@@ -38,7 +37,6 @@ export const Head: typeof import("../node_modules/.pnpm/nuxt@3.21.2_@vue+compile
 export const Html: typeof import("../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/head/runtime/components")['Html']
 export const Body: typeof import("../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/head/runtime/components")['Body']
 export const NuxtIsland: typeof import("../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/app/components/nuxt-island")['default']
-export const LazyAppNav: LazyComponent<typeof import("../components/AppNav.vue")['default']>
 export const LazyNuxtWelcome: LazyComponent<typeof import("../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/app/components/welcome.vue")['default']>
 export const LazyNuxtLayout: LazyComponent<typeof import("../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/app/components/nuxt-layout")['default']>
 export const LazyNuxtErrorBoundary: LazyComponent<typeof import("../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/app/components/nuxt-error-boundary.vue")['default']>

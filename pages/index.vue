@@ -1044,6 +1044,7 @@ onBeforeUnmount(() => {
     gap: 2px;
     line-height: 1;
     margin-bottom: 4px;
+    perspective: 400px;
 }
 
 .price-dollar {
@@ -1942,19 +1943,31 @@ onBeforeUnmount(() => {
 }
 
 /* ── Transitions ── */
-.price-flip-enter-active,
+@keyframes priceFlipOut {
+    to {
+        opacity: 0;
+        transform: translateY(10px) rotateX(20deg);
+    }
+}
+
+@keyframes priceFlipIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px) rotateX(-20deg);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) rotateX(0);
+    }
+}
+
 .price-flip-leave-active {
-    transition: all 0.25s ease;
+    animation: priceFlipOut 0.18s ease-in forwards;
 }
 
-.price-flip-enter-from {
-    opacity: 0;
-    transform: translateY(-8px);
-}
-
-.price-flip-leave-to {
-    opacity: 0;
-    transform: translateY(8px);
+.price-flip-enter-active {
+    animation: priceFlipIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .fade-enter-active,

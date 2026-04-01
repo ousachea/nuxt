@@ -14,7 +14,6 @@ type HydrationStrategies = {
 type LazyComponent<T> = DefineComponent<HydrationStrategies, {}, {}, {}, {}, {}, {}, { hydrated: () => void }> & T
 
 interface _GlobalComponents {
-  AppNav: typeof import("../../components/AppNav.vue")['default']
   NuxtWelcome: typeof import("../../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/app/components/welcome.vue")['default']
   NuxtLayout: typeof import("../../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/app/components/nuxt-layout")['default']
   NuxtErrorBoundary: typeof import("../../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/app/components/nuxt-error-boundary.vue")['default']
@@ -38,7 +37,6 @@ interface _GlobalComponents {
   Html: typeof import("../../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/head/runtime/components")['Html']
   Body: typeof import("../../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/head/runtime/components")['Body']
   NuxtIsland: typeof import("../../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/app/components/nuxt-island")['default']
-  LazyAppNav: LazyComponent<typeof import("../../components/AppNav.vue")['default']>
   LazyNuxtWelcome: LazyComponent<typeof import("../../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/app/components/welcome.vue")['default']>
   LazyNuxtLayout: LazyComponent<typeof import("../../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/app/components/nuxt-layout")['default']>
   LazyNuxtErrorBoundary: LazyComponent<typeof import("../../node_modules/.pnpm/nuxt@3.21.2_@vue+compiler-sfc@3.5.30_typescript@5.9.3_vite@7.3.1/node_modules/nuxt/dist/app/components/nuxt-error-boundary.vue")['default']>
