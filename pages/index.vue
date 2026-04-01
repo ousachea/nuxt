@@ -1288,9 +1288,9 @@ onBeforeUnmount(() => {
     border-radius: 10px;
     color: var(--text);
     font-family: var(--font);
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 500;
-    padding: 14px 14px;
+    padding: 6px 12px;
     width: 100%;
     transition: border-color 0.2s;
     -webkit-appearance: none;
