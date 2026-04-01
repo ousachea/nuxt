@@ -165,6 +165,11 @@
               <option value="newest">Newest</option>
               <option value="unviewed">Unviewed first</option>
             </select>
+            <!-- Surprise me: picks a random unviewed work from this artist -->
+            <button @click="surpriseMe" class="btn-surprise" title="Open a random unviewed work">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2z"/><path d="M12 8v4l3 3"/></svg>
+              <span>Surprise</span>
+            </button>
             <button @click="openAddWorkModal" class="btn-add">+ Add</button>
           </div>
         </div>
@@ -189,7 +194,10 @@
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
                   </span>
                 </div>
-                <span class="w-code">{{ work.code }}</span>
+                <span class="w-code" :class="{ 'w-code--has-tip': compactWorks }">
+                  {{ work.code }}
+                  <span v-if="compactWorks" class="w-code-tip">{{ work.code }}</span>
+                </span>
               </div>
             </div>
           </div>
@@ -592,10 +600,22 @@ function useCodeParser() {
     if (!code) return null
     if (cache.has(code)) return cache.get(code)
     const clean = code.toUpperCase().replace(/[^A-Z0-9]/g, '')
-    const m = clean.match(/^([A-Z]+)(\d+)$/)
-    const r = m
-      ? { full: clean, prefix: m[1].toLowerCase(), number: m[2], rawNumber: parseInt(m[2], 10) }
-      : { full: clean, prefix: clean.toLowerCase(), number: '001', rawNumber: 1 }
+    // FIX: use (.*?)(\d+)$ so prefixes like T28, 300MIUM, FC2PPV all parse correctly.
+    // The old ^([A-Z]+)(\d+)$ required a letters-only prefix, breaking any label
+    // that starts with or contains digits.
+    const m = clean.match(/^(.*?)(\d+)$/)
+    if (!m || !m[2]) {
+      const r = { full: clean, prefix: clean.toLowerCase(), number: '001', rawNumber: 1, paddedNumber: '00001', id: clean.toLowerCase() + '00001' }
+      cache.set(code, r); return r
+    }
+    const prefix      = m[1].toLowerCase()
+    const number      = m[2]
+    const rawNumber   = parseInt(number, 10)
+    // FIX: if number is already ≥5 digits don't truncate it — old slice(-5) turned
+    // ABC-100000 into abc00000 (wrong). Keep full number when it overflows padding.
+    const paddedNumber = number.length >= 5 ? number : ('00000' + number).slice(-5)
+    const id           = prefix + paddedNumber
+    const r = { full: clean, prefix, number, rawNumber, paddedNumber, id }
     cache.set(code, r)
     return r
   }
@@ -1102,17 +1122,21 @@ function getProgressiveImage(artist) { const cw = getCoverWork(artist); return c
 function getProgressiveWorkImage(work) {
   if (!work) return { full: null }
   if (customImages.value[work.code]) return { full: customImages.value[work.code] }
-  const p = parseCode(work.code); if (!p) return { full: null }
-  const id = p.prefix + ('00000' + p.number).slice(-5); if (id.length < 3) return { full: null }
-  return { thumb: `https://pics.dmm.co.jp/digital/video/${id}/${id}ps.jpg`, full: `https://pics.dmm.co.jp/digital/video/${id}/${id}pl.jpg` }
+  const p = parseCode(work.code); if (!p || !p.id || p.id.length < 3) return { full: null }
+  return {
+    thumb: `https://pics.dmm.co.jp/digital/video/${p.id}/${p.id}ps.jpg`,
+    full:  `https://pics.dmm.co.jp/digital/video/${p.id}/${p.id}pl.jpg`,
+  }
 }
 function getImageUrl(code, quality) {
   if (!quality) quality = 'pl'
   if (quality === 'pl' && customImages.value[code]) return customImages.value[code]
-  const p = parseCode(code); if (!p) return null
-  const id = p.prefix + ('00000' + p.number).slice(-5); if (id.length < 3) return null
-  if (quality !== 'pl') { const n = quality.split('-')[1] || '1'; return `https://pics.dmm.co.jp/digital/video/${id}/${id}jp-${n}.jpg` }
-  return `https://pics.dmm.co.jp/digital/video/${id}/${id}pl.jpg`
+  const p = parseCode(code); if (!p || !p.id || p.id.length < 3) return null
+  if (quality !== 'pl') {
+    const n = quality.split('-')[1] || '1'
+    return `https://pics.dmm.co.jp/digital/video/${p.id}/${p.id}jp-${n}.jpg`
+  }
+  return `https://pics.dmm.co.jp/digital/video/${p.id}/${p.id}pl.jpg`
 }
 function hasCustomImage(code) { return !!customImages.value[code] }
 function getCoverWork(artist) {
@@ -1215,6 +1239,22 @@ function addNewArtist() {
   artists.value = [...artists.value, { name, url: newArtistUrl.value.trim(), mainWorks: [], compilations: [], cover: '' }]
   showAddArtistModal.value = false; showToast('Added ' + name)
 }
+// ─── Surprise Me ─────────────────────────────────────────────────────────────
+function surpriseMe() {
+  if (!currentArtist.value) return
+  // Pool: all unviewed works across both sections, respecting current filter
+  const all = [
+    ...(currentArtist.value.mainWorks    || []),
+    ...(currentArtist.value.compilations || []),
+  ]
+  const unviewed = all.filter(w => !viewedWorks.value.includes(w.code))
+  const pool = unviewed.length > 0 ? unviewed : all   // fall back to all if everything seen
+  if (!pool.length) return showToast('No works found', 'info')
+  const pick = pool[Math.floor(Math.random() * pool.length)]
+  if (unviewed.length === 0) showToast('All viewed — picking anyway', 'info')
+  openWorkView(pick)
+}
+
 function openAddWorkModal() { newWork.value = { artist: activeTab.value || '', code: '', type: 'mainWorks' }; showAddWorkModal.value = true }
 function closeAddWorkModal() { showAddWorkModal.value = false }
 function addNewWork() {
@@ -1441,10 +1481,10 @@ function preloadAllGallery() {
 }
 function copyToClipboard(code) { navigator.clipboard.writeText(code).then(() => showToast('Copied: ' + code)).catch(() => showToast('Copy failed', 'error')) }
 function openExternalLink(code, type) {
-  const c    = code.toLowerCase()
-  const p    = parseCode(code)
-  const javId= p ? p.prefix + ('00000' + p.rawNumber).slice(-5) : c.replace('-', '')
-  const urls = {
+  const c     = code.toLowerCase()
+  const p     = parseCode(code)
+  const javId = p ? p.id : c.replace(/-/g, '')
+  const urls  = {
     missav:      `https://missav.ws/en/${c}`,
     '24av':      `https://24av.net/en/v/${c}`,
     javtrailers: `https://javtrailers.com/video/${javId}`,
@@ -1891,6 +1931,28 @@ function saveCustomImagesToDB(images) {
 .btn-add { padding-inline: 16px; height: 32px; background: var(--ink); color: var(--surface); border: 2px solid var(--ink); border-radius: 6px; font: 600 12px var(--sans); cursor: pointer; white-space: nowrap; transition: opacity var(--t); display: flex; align-items: center; gap: 4px; }
 .btn-add:hover { opacity: 0.8; }
 
+/* Surprise Me button */
+.btn-surprise {
+  padding-inline: 14px;
+  height: 32px;
+  background: var(--warm-bg);
+  color: var(--warm-dark);
+  border: 1.5px solid var(--warm);
+  border-radius: 6px;
+  font: 600 12px var(--sans);
+  cursor: pointer;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background var(--t), color var(--t), transform 0.15s ease;
+}
+.btn-surprise:hover {
+  background: var(--warm);
+  color: #fff;
+}
+.btn-surprise:active { transform: scale(0.95); }
+
 /* ─── Work section ─── */
 .w-section { margin-block-end: 40px; }
 .w-head { display: flex; align-items: center; gap: 10px; margin-block-end: 16px; padding: 10px 14px; background: var(--surface); border: 1.5px solid var(--line2); border-radius: var(--r); }
@@ -1909,7 +1971,49 @@ function saveCustomImagesToDB(images) {
 .w-img img { width: 100%; height: 100%; object-fit: cover; }
 
 .badge-star { position: absolute; inset-block-start: 6px; inset-inline-end: 6px; z-index: 2; width: 22px; height: 22px; border-radius: 50%; background: var(--warm); color: #fff; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
-.w-code { font: 600 12px var(--mono); color: var(--ink); display: block; padding-inline: 2px; }
+.w-code {
+  font: 600 12px var(--mono);
+  color: var(--ink);
+  display: block;
+  padding-inline: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Tooltip — only rendered when compact mode is on (.w-code--has-tip) */
+.w-code--has-tip { position: relative; }
+.w-code-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  background: var(--ink);
+  color: var(--surface);
+  font: 600 11px var(--mono);
+  padding: 4px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 20;
+  /* arrow */
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,.2));
+}
+.w-code-tip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--ink);
+}
+.w-code--has-tip:hover .w-code-tip {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
 
 /* ─── Detail ─── */
 .detail { display: grid; grid-template-columns: 1fr 500px; gap: 24px; }
