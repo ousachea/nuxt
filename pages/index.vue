@@ -226,7 +226,11 @@
 
                 <!-- Purchase Cards -->
                 <div v-if="purchases.length" class="purchases-list">
-                    <div v-for="(p, i) in purchases" :key="p.id" class="p-card" :class="gainClass(p)">
+                    <div v-for="(p, i) in purchases" :key="p.id" class="p-card" :style="{
+        borderLeftColor: gainLoss(p) >= 0 ? 'var(--gain)' : 'var(--loss)',
+        borderColor: gainLoss(p) >= 0 ? 'var(--gain-border)' : 'var(--loss-border)',
+        background: gainLoss(p) >= 0 ? 'var(--gain-bg)' : 'var(--loss-bg)'
+    }">
                         <template v-if="editIdx !== i">
                             <!-- Card Header -->
                             <div class="pcard-header">
@@ -250,12 +254,13 @@
                                 <div class="gl-divider" />
                                 <div class="gl-col">
                                     <span class="gl-label">{{ t.current }}</span>
-                                    <span class="gl-val" :class="gainClass(p)">${{ currentValue(p).toFixed(2) }}</span>
+                                    <span class="gl-val" :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">${{
+        currentValue(p).toFixed(2) }}</span>
                                 </div>
                                 <div class="gl-divider" />
                                 <div class="gl-col">
                                     <span class="gl-label">{{ t.gainLoss }}</span>
-                                    <span class="gl-val gl-main" :class="gainClass(p)">
+                                    <span class="gl-val gl-main" :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">
                                         {{ gainLoss(p) >= 0 ? '+' : '' }}${{ gainLoss(p).toFixed(2) }}
                                     </span>
                                 </div>
@@ -680,7 +685,7 @@ onBeforeUnmount(() => {
 }
 
 /* ── Design Tokens ── */
-:root {
+.app {
     --gold: #F5C842;
     --gold-dim: #C08A10;
     --gold-alpha: rgba(245, 200, 66, 0.12);
@@ -1657,18 +1662,19 @@ onBeforeUnmount(() => {
     border-radius: 14px;
     padding: 14px;
     transition: all 0.2s;
+    border-left: 3px solid var(--border);
 }
 
 .p-card.gain {
     border-color: var(--gain-border);
     background: var(--gain-bg);
-    border-left: 3px solid var(--gain);
+    border-left-color: var(--gain);
 }
 
 .p-card.loss {
     border-color: var(--loss-border);
     background: var(--loss-bg);
-    border-left: 3px solid var(--loss);
+    border-left-color: var(--loss);
 }
 
 .pcard-header {
@@ -1780,16 +1786,16 @@ onBeforeUnmount(() => {
     color: var(--text);
 }
 
-.gl-val.gain {
-    color: var(--gain);
-}
-
-.gl-val.loss {
-    color: var(--loss);
-}
-
 .gl-main {
     font-size: 14px;
+}
+
+.gain-text {
+    color: var(--gain) !important;
+}
+
+.loss-text {
+    color: var(--loss) !important;
 }
 
 .edit-actions {
