@@ -2,8 +2,10 @@
     <div class="app" :class="{ dark: isDark }">
         <!-- Ambient Background -->
         <div class="ambient" aria-hidden="true">
-            <div class="orb orb-1" :class="{ fetching: loading }" />
-            <div class="orb orb-2" :class="{ fetching: loading }" />
+            <div class="orb orb-1"
+                :class="{ fetching: loading, 'orb-up': orbColor === 'up', 'orb-down': orbColor === 'down' }" />
+            <div class="orb orb-2"
+                :class="{ fetching: loading, 'orb-up': orbColor === 'up', 'orb-down': orbColor === 'down' }" />
         </div>
 
         <!-- Header -->
@@ -53,9 +55,9 @@
                     <div class="ss-time">{{ ssTime }}</div>
                     <div class="ss-price" v-if="goldPrice">
                         <span class="ss-price-val">${{ goldPrice.toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    }) }}</span>
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                            }) }}</span>
                         <span class="ss-price-unit">XAU / USD</span>
                     </div>
                     <div class="ss-date">{{ ssDate }}</div>
@@ -95,21 +97,28 @@
                                 class="live-dot" /><span v-if="isLive" class="live-badge">LIVE</span><span
                                 class="last-updated">{{ lastUpdated }}</span></span>
                     </div>
-
-                    <!-- Digit Roll Ticker -->
-                    <div class="hero-price ticker-row">
-                        <span class="price-dollar">$</span>
-                        <div class="digit-ticker" v-if="goldPrice">
-                            <div v-for="(col, i) in tickerCols" :key="i" class="digit-col"
-                                :class="{ separator: col.isSep, rolling: col.rolling }">
-                                <div class="digit-reel" :style="col.reelStyle">
-                                    <span v-for="(ch, j) in col.chars" :key="j">{{ ch }}</span>
-                                </div>
+                </div>
+                <!-- Digit Roll Ticker -->
+                <div class="hero-price ticker-row">
+                    <span class="price-dollar">$</span>
+                    <div class="digit-ticker" v-if="goldPrice"
+                        :class="{ 'flash-up': priceFlash === 'up', 'flash-down': priceFlash === 'down' }">
+                        <div v-for="(col, i) in tickerCols" :key="i" class="digit-col"
+                            :class="{ separator: col.isSep, rolling: col.rolling }">
+                            <div class="digit-reel" :style="col.reelStyle">
+                                <span v-for="(ch, j) in col.chars" :key="j">{{ ch }}</span>
                             </div>
                         </div>
-                        <div v-else class="price-empty">——</div>
                     </div>
+                    <div v-else class="price-empty">——</div>
+                </div>
+                <div class="price-bottom-row">
                     <span class="price-unit-label">{{ t.perTroyOz }}</span>
+                    <transition name="pill-pop">
+                        <span v-if="changePill.show" class="change-pill" :class="changePill.dir">
+                            {{ changePill.dir === 'up' ? '▲' : '▼' }} {{ changePill.text }}
+                        </span>
+                    </transition>
                 </div>
 
                 <!-- Shimmer skeleton chips while loading, real chips after -->
@@ -143,7 +152,7 @@
                             <span class="api-badge">gold-api.com</span>
                             <span class="api-hint-text">{{ t.apiHint }}</span>
                         </div>
-                        <button class="primary-btn refresh-btn" @click="fetchPrice" :disabled="loading">
+                        <button class="primary-btn refresh-btn" @click="fetchPrice($event)" :disabled="loading">
                             <span :class="{ 'spin': loading }">↻</span>
                             {{ loading ? t.loading : t.refresh }}
                         </button>
@@ -265,16 +274,17 @@
                 </transition>
 
                 <div v-if="purchases.length" class="purchases-list">
-                    <div v-for="(p, i) in purchases" :key="p.id" class="p-card" :style="{
+                    <div v-for="(p, i) in purchases" :key="p.id" class="p-card slide-in-card" :style="{
         borderLeftColor: gainLoss(p) >= 0 ? 'var(--gain)' : 'var(--loss)',
         borderColor: gainLoss(p) >= 0 ? 'var(--gain-border)' : 'var(--loss-border)',
-        background: gainLoss(p) >= 0 ? 'var(--gain-bg)' : 'var(--loss-bg)'
+        background: gainLoss(p) >= 0 ? 'var(--gain-bg)' : 'var(--loss-bg)',
+        animationDelay: (i * 0.1) + 's'
     }">
                         <div v-if="editIdx !== i">
                             <div class="pcard-header">
                                 <div class="pcard-weight-row">
                                     <span class="pcard-weight">{{ p.weight }} <span class="pcard-unit">{{ t[p.unit] ||
-        p.unit }}</span></span>
+                                            p.unit }}</span></span>
                                     <span class="pcard-date">{{ formatDate(p.date) }}</span>
                                 </div>
                                 <div class="pcard-btns">
@@ -292,7 +302,7 @@
                                 <div class="gl-col">
                                     <span class="gl-label">{{ t.current }}</span>
                                     <span class="gl-val" :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">${{
-        currentValue(p).toFixed(2) }}</span>
+                                        currentValue(p).toFixed(2) }}</span>
                                 </div>
                                 <div class="gl-divider" />
                                 <div class="gl-col">
@@ -340,15 +350,16 @@
                     <div class="sum-row">
                         <div class="sum-item">
                             <span class="sum-label">{{ t.totalInvested }}</span>
-                            <span class="sum-val">${{ totalInvested.toFixed(2) }}</span>
+                            <span ref="sumInvested" class="sum-val">${{ totalInvested.toFixed(2) }}</span>
                         </div>
                         <div class="sum-item" :class="totalGL >= 0 ? 'gain' : 'loss'">
                             <span class="sum-label">{{ t.currentValue }}</span>
-                            <span class="sum-val">${{ totalCurrent.toFixed(2) }}</span>
+                            <span ref="sumCurrent" class="sum-val">${{ totalCurrent.toFixed(2) }}</span>
                         </div>
                         <div class="sum-item" :class="totalGL >= 0 ? 'gain' : 'loss'">
                             <span class="sum-label">{{ t.totalGainLoss }}</span>
-                            <span class="sum-val">{{ totalGL >= 0 ? '+' : '' }}${{ totalGL.toFixed(2) }}</span>
+                            <span ref="sumGL" class="sum-val">{{ totalGL >= 0 ? '+' : '' }}${{ totalGL.toFixed(2)
+                                }}</span>
                         </div>
                     </div>
                     <!-- Liquid bar -->
@@ -409,11 +420,20 @@ const draft = ref({ weight: '', unit: 'chi', price: '', date: today() })
 const editIdx = ref(null)
 const editDraft = ref({})
 const csvInput = ref(null)
+const sumInvested = ref(null)
+const sumCurrent = ref(null)
+const sumGL = ref(null)
 
 // ─── Animation state ──────────────────────────────────────────────────────────
 const gemSpinning = ref(false)
 const accentTrace = ref(false)
 const tickerCols = ref([])
+const priceFlash = ref('')
+const changePill = ref({ show: false, dir: 'up', text: '' })
+const orbColor = ref('neutral')
+let prevGoldPrice = null
+let priceFlashTimer = null
+let pillTimer = null
 
 // ─── Screensaver ──────────────────────────────────────────────────────────────
 const screensaver = ref(false)
@@ -622,10 +642,12 @@ function buildTicker(price) {
     })
 }
 
-watch(goldPrice, (val) => {
+watch(goldPrice, (val, oldVal) => {
     buildTicker(val)
     triggerAccent()
     triggerGemSpin()
+    triggerPriceFlash(val, oldVal)
+    triggerOrbShift(val, oldVal)
 })
 
 // Fire confetti when portfolio crosses a positive milestone (0%, 5%, 10%, 25%, 50%)
@@ -650,6 +672,55 @@ function triggerGemSpin() {
 function triggerAccent() {
     accentTrace.value = false
     nextTick(() => { accentTrace.value = true })
+}
+
+function triggerPriceFlash(val, oldVal) {
+    if (!oldVal || !val) return
+    const dir = val > oldVal ? 'up' : val < oldVal ? 'down' : null
+    if (!dir) return
+    // flash color
+    priceFlash.value = ''
+    nextTick(() => { priceFlash.value = dir })
+    clearTimeout(priceFlashTimer)
+    priceFlashTimer = setTimeout(() => { priceFlash.value = '' }, 700)
+    // change pill
+    const diff = Math.abs(val - oldVal).toFixed(2)
+    clearTimeout(pillTimer)
+    changePill.value = { show: true, dir, text: `$${diff}` }
+    pillTimer = setTimeout(() => { changePill.value = { ...changePill.value, show: false } }, 3500)
+}
+
+function triggerOrbShift(val, oldVal) {
+    if (!oldVal || !val) return
+    if (val > oldVal) orbColor.value = 'up'
+    else if (val < oldVal) orbColor.value = 'down'
+}
+
+// Ripple on refresh button tap
+function doRipple(e) {
+    const btn = e.currentTarget
+    const r = document.createElement('span')
+    const rect = btn.getBoundingClientRect()
+    const size = Math.max(rect.width, rect.height)
+    r.style.cssText = `position:absolute;width:${size}px;height:${size}px;left:${e.clientX - rect.left - size / 2}px;top:${e.clientY - rect.top - size / 2}px;border-radius:50%;background:rgba(255,255,255,0.35);transform:scale(0);animation:rippleAnim 0.55s ease-out forwards;pointer-events:none`
+    btn.appendChild(r)
+    setTimeout(() => r.remove(), 600)
+}
+
+// Count-up animation for summary numbers
+function animateCount(el, target, prefix = '$') {
+    if (!el) return
+    const duration = 850
+    const start = performance.now()
+    const startVal = 0
+    function step(now) {
+        const p = Math.min((now - start) / duration, 1)
+        const ease = 1 - Math.pow(1 - p, 4)
+        el.textContent = prefix + (startVal + (target - startVal) * ease).toFixed(2)
+        if (p < 1) requestAnimationFrame(step)
+        else el.textContent = prefix + target.toFixed(2)
+    }
+    requestAnimationFrame(step)
 }
 
 // ─── Methods ──────────────────────────────────────────────────────────────────
@@ -696,9 +767,11 @@ async function pasteClipboard() {
 }
 
 // Simulate 3 ticking price changes, then do the real API call on the 4th tick
-async function fetchPrice() {
+async function fetchPrice(e) {
+    if (e && e.currentTarget) doRipple(e)
     loading.value = true
     isLive.value = false
+    orbColor.value = 'neutral'
 
     const base = goldPrice.value || 3300
     const fakeDeltas = [
@@ -842,6 +915,14 @@ onMounted(() => {
         priceSource.value = d.priceSource || 'api'
         if (d.goldPrice) buildTicker(d.goldPrice)
     }
+    // count-up on load
+    nextTick(() => {
+        setTimeout(() => {
+            if (sumInvested.value) animateCount(sumInvested.value, totalInvested.value)
+            setTimeout(() => { if (sumCurrent.value) animateCount(sumCurrent.value, totalCurrent.value) }, 120)
+            setTimeout(() => { if (sumGL.value) animateCount(sumGL.value, Math.abs(totalGL.value), (totalGL.value >= 0 ? '+$' : '-$')) }, 240)
+        }, 200)
+    })
     if (priceSource.value === 'api') fetchPrice()
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
@@ -999,6 +1080,34 @@ onBeforeUnmount(() => {
     line-height: 1;
     display: inline-block;
     transform-style: preserve-3d;
+}
+
+.logo-gem {
+    animation: heartbeat 4s ease-in-out infinite;
+}
+
+@keyframes heartbeat {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    10% {
+        transform: scale(1.22);
+    }
+
+    20% {
+        transform: scale(1);
+    }
+
+    30% {
+        transform: scale(1.12);
+    }
+
+    40% {
+        transform: scale(1);
+    }
 }
 
 .logo-gem.spinning,
@@ -2155,6 +2264,142 @@ onBeforeUnmount(() => {
     50% {
         opacity: 0.4;
         transform: scale(0.7);
+    }
+}
+
+
+/* ── Price flash ── */
+.digit-ticker.flash-up {
+    animation: flashUp 0.65s ease forwards;
+}
+
+.digit-ticker.flash-down {
+    animation: flashDown 0.65s ease forwards;
+}
+
+@keyframes flashUp {
+    0% {
+        filter: drop-shadow(0 0 12px rgba(34, 197, 94, .7));
+    }
+
+    40% {
+        filter: drop-shadow(0 0 20px rgba(34, 197, 94, .5));
+    }
+
+    100% {
+        filter: none;
+    }
+}
+
+@keyframes flashDown {
+    0% {
+        filter: drop-shadow(0 0 12px rgba(248, 113, 113, .7));
+    }
+
+    40% {
+        filter: drop-shadow(0 0 20px rgba(248, 113, 113, .5));
+    }
+
+    100% {
+        filter: none;
+    }
+}
+
+/* ── Change pill ── */
+.price-bottom-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 2px;
+}
+
+.change-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-family: var(--mono);
+}
+
+.change-pill.up {
+    background: var(--gain-bg);
+    color: var(--gain);
+    border: 1px solid var(--gain-border);
+}
+
+.change-pill.down {
+    background: var(--loss-bg);
+    color: var(--loss);
+    border: 1px solid var(--loss-border);
+}
+
+.pill-pop-enter-active {
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pill-pop-leave-active {
+    transition: all 0.2s ease;
+}
+
+.pill-pop-enter-from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.85);
+}
+
+.pill-pop-leave-to {
+    opacity: 0;
+    transform: translateY(-4px);
+}
+
+/* ── Orb color shift ── */
+.orb.orb-up {
+    background: #22C55E !important;
+    transition: background 1.8s ease;
+}
+
+.orb.orb-down {
+    background: #F87171 !important;
+    transition: background 1.8s ease;
+}
+
+.orb-1 {
+    transition: background 1.8s ease;
+}
+
+.orb-2 {
+    transition: background 1.8s ease;
+}
+
+/* ── Button ripple ── */
+.refresh-btn {
+    overflow: hidden;
+}
+
+@keyframes rippleAnim {
+    to {
+        transform: scale(4);
+        opacity: 0;
+    }
+}
+
+
+/* ── Purchase card slide-in ── */
+.slide-in-card {
+    animation: slideInCard 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes slideInCard {
+    from {
+        opacity: 0;
+        transform: translateX(-18px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
     }
 }
 
