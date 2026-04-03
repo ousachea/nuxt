@@ -2,21 +2,24 @@
     <div class="app" :class="{ dark: isDark }">
         <!-- Ambient Background -->
         <div class="ambient" aria-hidden="true">
-            <div class="orb orb-1" />
-            <div class="orb orb-2" />
+            <div class="orb orb-1" :class="{ fetching: loading }" />
+            <div class="orb orb-2" :class="{ fetching: loading }" />
         </div>
 
         <!-- Header -->
         <header class="header">
             <div class="header-inner">
                 <div class="logo">
-                    <span class="logo-gem">◈</span>
+                    <span class="logo-gem" :class="{ spinning: gemSpinning }">◈</span>
                     <div class="logo-text">
                         <span class="logo-title">{{ t.title }}</span>
                         <span class="logo-sub">gold portfolio tracker</span>
                     </div>
                 </div>
                 <div class="header-controls">
+                    <button class="ctrl-btn" @click="activateScreensaver" aria-label="Screensaver">
+                        <span>⬛</span>
+                    </button>
                     <button class="ctrl-btn" @click="toggleDark" :aria-label="isDark ? 'Light mode' : 'Dark mode'">
                         <span>{{ isDark ? '☀' : '◑' }}</span>
                     </button>
@@ -31,19 +34,47 @@
             </div>
         </header>
 
-        <!-- Sticky Price Pill (visible when scrolled) -->
+        <!-- Sticky Price Pill -->
         <div class="sticky-price" :class="{ visible: showStickyPrice && goldPrice }">
-            <span class="sticky-gem">◈</span>
+            <span class="sticky-gem" :class="{ spinning: gemSpinning }">◈</span>
             <span class="sticky-val">${{ goldPrice?.toFixed(2) ?? '——' }}</span>
             <span class="sticky-unit">/ oz</span>
             <button class="sticky-refresh" @click="fetchPrice" :disabled="loading">↻</button>
         </div>
 
+        <!-- ── SCREENSAVER ── -->
+        <transition name="ss-fade">
+            <div v-if="screensaver" class="screensaver" @click="dismissScreensaver" @touchstart="dismissScreensaver">
+                <div class="ss-orb ss-orb1" />
+                <div class="ss-orb ss-orb2" />
+                <div class="ss-orb ss-orb3" />
+                <div class="ss-content">
+                    <div class="ss-gem">◈</div>
+                    <div class="ss-time">{{ ssTime }}</div>
+                    <div class="ss-price" v-if="goldPrice">
+                        <span class="ss-price-val">${{ goldPrice.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    }) }}</span>
+                        <span class="ss-price-unit">XAU / USD</span>
+                    </div>
+                    <div class="ss-date">{{ ssDate }}</div>
+                    <div class="ss-tap">TAP TO DISMISS</div>
+                </div>
+            </div>
+        </transition>
+
+        <!-- ── CONFETTI CANVAS ── -->
+        <canvas ref="confettiCanvas" class="confetti-canvas" aria-hidden="true" />
+
         <main class="main">
 
             <!-- ── PRICE SECTION ── -->
             <section class="card price-hero">
-                <div class="card-accent" />
+                <!-- Accent line trace -->
+                <div class="card-accent">
+                    <div class="accent-fill" :class="{ trace: accentTrace }" />
+                </div>
 
                 <!-- Source Toggle -->
                 <div class="seg-ctrl">
@@ -60,28 +91,42 @@
                 <div class="hero-price-block">
                     <div class="hero-meta-row">
                         <span class="metal-tag">🥇 {{ t.gold }}</span>
-                        <span v-if="lastUpdated && priceSource === 'api'" class="last-updated">{{ lastUpdated }}</span>
+                        <span v-if="lastUpdated && priceSource === 'api'" class="last-updated-wrap"><span v-if="isLive"
+                                class="live-dot" /><span v-if="isLive" class="live-badge">LIVE</span><span
+                                class="last-updated">{{ lastUpdated }}</span></span>
                     </div>
-                    <transition name="price-flip" mode="out-in">
-                        <div class="hero-price" :key="goldPrice?.toFixed(0) ?? 'null'">
-                            <span class="price-dollar">$</span>
-                            <span class="price-int">{{ goldPrice ? Math.floor(goldPrice).toLocaleString() : '——'
-                                }}</span>
-                            <span v-if="goldPrice" class="price-dec">.{{ (goldPrice % 1).toFixed(2).slice(2) }}</span>
+
+                    <!-- Digit Roll Ticker -->
+                    <div class="hero-price ticker-row">
+                        <span class="price-dollar">$</span>
+                        <div class="digit-ticker" v-if="goldPrice">
+                            <div v-for="(col, i) in tickerCols" :key="i" class="digit-col"
+                                :class="{ separator: col.isSep, rolling: col.rolling }">
+                                <div class="digit-reel" :style="col.reelStyle">
+                                    <span v-for="(ch, j) in col.chars" :key="j">{{ ch }}</span>
+                                </div>
+                            </div>
                         </div>
-                    </transition>
+                        <div v-else class="price-empty">——</div>
+                    </div>
                     <span class="price-unit-label">{{ t.perTroyOz }}</span>
                 </div>
 
-                <!-- Per-unit chips -->
-                <div v-if="goldPrice" class="chips-scroll">
+                <!-- Shimmer skeleton chips while loading, real chips after -->
+                <div v-if="loading" class="chips-scroll">
+                    <div v-for="n in 6" :key="n" class="chip shimmer-chip">
+                        <div class="shimmer-line short" />
+                        <div class="shimmer-line long" />
+                    </div>
+                </div>
+                <div v-else-if="goldPrice" class="chips-scroll">
                     <div v-for="u in priceUnits" :key="u.key" class="chip">
                         <span class="chip-label">{{ t[u.key] || u.label }}</span>
                         <span class="chip-price">${{ u.price < 1 ? u.price.toFixed(4) : u.price.toFixed(2) }}</span>
                     </div>
                 </div>
 
-                <!-- Loading -->
+                <!-- Loading progress -->
                 <div v-if="loading" class="progress-bar">
                     <div class="progress-fill" />
                 </div>
@@ -138,20 +183,17 @@
             <!-- ── CONVERTER ── -->
             <section class="card">
                 <h2 class="section-title">{{ t.unitConverter }}</h2>
-
                 <div class="conv-tabs-scroll">
                     <button v-for="u in converterUnits" :key="u" class="conv-tab" :class="{ active: activeConv === u }"
                         @click="activeConv = u">
                         {{ t[u] || u }}
                     </button>
                 </div>
-
                 <div class="conv-input-row">
                     <div class="from-badge">{{ t[activeConv] }}</div>
                     <input v-model.number="convInput" class="text-input conv-input" type="text" inputmode="decimal"
                         :placeholder="'1'" />
                 </div>
-
                 <div class="conv-results">
                     <div v-for="u in converterUnits.filter(x => x !== activeConv)" :key="u" class="conv-row">
                         <span class="conv-label">{{ t[u] }}</span>
@@ -189,13 +231,11 @@
                     </div>
                 </div>
 
-                <!-- FAB-style Add Button -->
                 <button class="add-purchase-btn" @click="showForm = !showForm">
                     <span class="add-icon">{{ showForm ? '✕' : '+' }}</span>
                     <span>{{ showForm ? t.cancel : t.addPurchase }}</span>
                 </button>
 
-                <!-- Add Form -->
                 <transition name="slide-down">
                     <div v-if="showForm" class="purchase-form">
                         <div class="form-grid">
@@ -224,15 +264,13 @@
                     </div>
                 </transition>
 
-                <!-- Purchase Cards -->
                 <div v-if="purchases.length" class="purchases-list">
                     <div v-for="(p, i) in purchases" :key="p.id" class="p-card" :style="{
         borderLeftColor: gainLoss(p) >= 0 ? 'var(--gain)' : 'var(--loss)',
         borderColor: gainLoss(p) >= 0 ? 'var(--gain-border)' : 'var(--loss-border)',
         background: gainLoss(p) >= 0 ? 'var(--gain-bg)' : 'var(--loss-bg)'
     }">
-                        <template v-if="editIdx !== i">
-                            <!-- Card Header -->
+                        <div v-if="editIdx !== i">
                             <div class="pcard-header">
                                 <div class="pcard-weight-row">
                                     <span class="pcard-weight">{{ p.weight }} <span class="pcard-unit">{{ t[p.unit] ||
@@ -245,7 +283,6 @@
                                         :aria-label="t.delete">✕</button>
                                 </div>
                             </div>
-                            <!-- GL Bar -->
                             <div class="gl-row">
                                 <div class="gl-col">
                                     <span class="gl-label">{{ t.paid }}</span>
@@ -265,10 +302,9 @@
                                     </span>
                                 </div>
                             </div>
-                        </template>
+                        </div>
 
-                        <!-- Edit Form -->
-                        <template v-else>
+                        <div v-else>
                             <div class="form-grid">
                                 <div class="form-field">
                                     <label>{{ t.weight }}</label>
@@ -295,11 +331,11 @@
                                 <button class="primary-btn" style="flex:1" @click="saveEdit">{{ t.save }}</button>
                                 <button class="ghost-btn" style="flex:1" @click="editIdx = null">{{ t.cancel }}</button>
                             </div>
-                        </template>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Portfolio Summary -->
+                <!-- Portfolio Summary with liquid bar -->
                 <div v-if="purchases.length" class="summary">
                     <div class="sum-row">
                         <div class="sum-item">
@@ -315,9 +351,9 @@
                             <span class="sum-val">{{ totalGL >= 0 ? '+' : '' }}${{ totalGL.toFixed(2) }}</span>
                         </div>
                     </div>
-                    <!-- Mini progress bar showing gain/loss ratio -->
+                    <!-- Liquid bar -->
                     <div v-if="totalInvested > 0" class="portfolio-bar">
-                        <div class="portfolio-fill" :class="totalGL >= 0 ? 'gain' : 'loss'"
+                        <div class="portfolio-fill liquid-fill" :class="totalGL >= 0 ? 'gain' : 'loss'"
                             :style="{ width: Math.min(Math.abs(totalGL / totalInvested) * 100, 100) + '%' }" />
                     </div>
                     <div v-if="totalInvested > 0" class="portfolio-pct" :class="totalGL >= 0 ? 'gain' : 'loss'">
@@ -340,9 +376,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const TROY = 31.1035
 const DAMLUNG = 37.5
 const CHI = 3.75
@@ -362,6 +397,7 @@ const customApiUrl = ref('')
 const goldPrice = ref(null)
 const lastUpdated = ref('')
 const loading = ref(false)
+const isLive = ref(false)
 const flashMsg = ref('')
 const flashType = ref('success')
 const activeConv = ref('chi')
@@ -374,97 +410,143 @@ const editIdx = ref(null)
 const editDraft = ref({})
 const csvInput = ref(null)
 
+// ─── Animation state ──────────────────────────────────────────────────────────
+const gemSpinning = ref(false)
+const accentTrace = ref(false)
+const tickerCols = ref([])
+
+// ─── Screensaver ──────────────────────────────────────────────────────────────
+const screensaver = ref(false)
+const ssTime = ref('')
+const ssDate = ref('')
+let ssClockTimer = null
+let idleTimer = null
+const IDLE_MS = 5 * 60 * 1000 // 5 min auto-trigger
+
+function updateSsClock() {
+    const n = new Date()
+    const h = String(n.getHours()).padStart(2, '0')
+    const m = String(n.getMinutes()).padStart(2, '0')
+    const s = String(n.getSeconds()).padStart(2, '0')
+    ssTime.value = `${h}:${m}:${s}`
+    ssDate.value = n.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+}
+
+function activateScreensaver() {
+    screensaver.value = true
+    updateSsClock()
+    ssClockTimer = setInterval(updateSsClock, 1000)
+}
+
+function dismissScreensaver() {
+    screensaver.value = false
+    clearInterval(ssClockTimer)
+    resetIdleTimer()
+}
+
+function resetIdleTimer() {
+    clearTimeout(idleTimer)
+    idleTimer = setTimeout(activateScreensaver, IDLE_MS)
+}
+
+// ─── Confetti ─────────────────────────────────────────────────────────────────
+const confettiCanvas = ref(null)
+let confettiAnimFrame = null
+let prevTotalGL = null
+
+const CONF_COLORS = ['#F5C842', '#22C55E', '#60A5FA', '#F87171', '#C084FC', '#FB923C', '#FBBF24']
+
+function launchConfetti() {
+    const canvas = confettiCanvas.value
+    if (!canvas) return
+    const W = window.innerWidth
+    const H = window.innerHeight
+    canvas.width = W
+    canvas.height = H
+    canvas.style.display = 'block'
+
+    const pieces = Array.from({ length: 80 }, () => ({
+        x: Math.random() * W,
+        y: -10 - Math.random() * 80,
+        r: 4 + Math.random() * 5,
+        color: CONF_COLORS[Math.floor(Math.random() * CONF_COLORS.length)],
+        vx: (Math.random() - 0.5) * 4,
+        vy: 3 + Math.random() * 4,
+        rot: Math.random() * 360,
+        rotV: (Math.random() - 0.5) * 8,
+        shape: Math.random() > 0.5 ? 'rect' : 'circle',
+        alpha: 1,
+    }))
+
+    const ctx = canvas.getContext('2d')
+    let done = false
+
+    function frame() {
+        ctx.clearRect(0, 0, W, H)
+        let alive = 0
+        for (const p of pieces) {
+            p.x += p.vx
+            p.y += p.vy
+            p.vy += 0.12
+            p.rot += p.rotV
+            if (p.y > H * 0.7) p.alpha = Math.max(0, p.alpha - 0.03)
+            if (p.alpha <= 0) continue
+            alive++
+            ctx.save()
+            ctx.globalAlpha = p.alpha
+            ctx.translate(p.x, p.y)
+            ctx.rotate((p.rot * Math.PI) / 180)
+            ctx.fillStyle = p.color
+            if (p.shape === 'circle') {
+                ctx.beginPath(); ctx.arc(0, 0, p.r, 0, Math.PI * 2); ctx.fill()
+            } else {
+                ctx.fillRect(-p.r, -p.r / 2, p.r * 2, p.r)
+            }
+            ctx.restore()
+        }
+        if (alive > 0) confettiAnimFrame = requestAnimationFrame(frame)
+        else { canvas.style.display = 'none'; ctx.clearRect(0, 0, W, H) }
+    }
+    cancelAnimationFrame(confettiAnimFrame)
+    confettiAnimFrame = requestAnimationFrame(frame)
+}
+
 // ─── i18n ────────────────────────────────────────────────────────────────────
 const translations = {
     en: {
-        title: 'Gold Tracker',
-        gold: 'Gold',
-        live: 'Live',
-        custom: 'Custom',
-        refresh: 'Refresh',
-        loading: 'Loading…',
-        pricesUpdated: '✓ Updated',
-        perTroyOz: '/ troy oz',
-        priceByUnit: 'Price by Unit',
-        unitConverter: 'Unit Converter',
-        myPurchases: 'My Purchases',
-        addPurchase: 'Add Purchase',
-        cancel: 'Cancel',
-        weight: 'Weight',
-        unit: 'Unit',
-        pricePaid: 'Price Paid',
-        date: 'Date',
-        save: 'Save',
-        edit: 'Edit',
-        delete: 'Delete',
-        paid: 'Paid',
-        current: 'Current',
-        gainLoss: 'G / L',
-        portfolioSummary: 'Portfolio',
-        totalInvested: 'Invested',
-        currentValue: 'Value Now',
-        totalGainLoss: 'Total G/L',
-        exportCSV: 'Export',
-        importCSV: 'Import',
-        enterWeight: 'e.g. 2',
-        enterPrice: 'e.g. 240',
-        enterPriceFor: 'Price per',
-        apiHint: 'Optional API key for higher rate limits',
-        apiKeyPlaceholder: 'Paste goldapi.io key (optional)…',
-        freeNoKey: 'Free, no key needed',
-        asBackup: 'key as fallback',
-        paste: 'Paste',
-        clear: 'Clear',
-        gram: 'Gram', li: 'Li', hun: 'Hun', chi: 'Chi',
-        damlung: 'Damlung', troyOunce: 'Troy Oz', troyOz: 'Troy Oz',
-        fetchPriceFirst: 'Fetch a price first',
+        title: 'Gold Tracker', gold: 'Gold', live: 'Live', custom: 'Custom',
+        refresh: 'Refresh', loading: 'Loading…', pricesUpdated: '✓ Updated',
+        perTroyOz: '/ troy oz', priceByUnit: 'Price by Unit', unitConverter: 'Unit Converter',
+        myPurchases: 'My Purchases', addPurchase: 'Add Purchase', cancel: 'Cancel',
+        weight: 'Weight', unit: 'Unit', pricePaid: 'Price Paid', date: 'Date',
+        save: 'Save', edit: 'Edit', delete: 'Delete', paid: 'Paid', current: 'Current',
+        gainLoss: 'G / L', portfolioSummary: 'Portfolio', totalInvested: 'Invested',
+        currentValue: 'Value Now', totalGainLoss: 'Total G/L', exportCSV: 'Export',
+        importCSV: 'Import', enterWeight: 'e.g. 2', enterPrice: 'e.g. 240',
+        enterPriceFor: 'Price per', apiHint: 'Optional API key for higher rate limits',
+        apiKeyPlaceholder: 'Paste goldapi.io key (optional)…', freeNoKey: 'Free, no key needed',
+        asBackup: 'key as fallback', paste: 'Paste', clear: 'Clear',
+        gram: 'Gram', li: 'Li', hun: 'Hun', chi: 'Chi', damlung: 'Damlung',
+        troyOunce: 'Troy Oz', troyOz: 'Troy Oz', fetchPriceFirst: 'Fetch a price first',
         offlineWarning: 'You are offline — prices may be outdated',
         noPurchases: 'No purchases yet. Tap + Add above.',
     },
     km: {
-        title: 'តាមដានមាស',
-        gold: 'មាស',
-        live: 'បន្តផ្ទាល់',
-        custom: 'កំណត់ផ្ទាល់',
-        refresh: 'ធ្វើបច្ចុប្បន្នភាព',
-        loading: 'កំពុងផ្ទុក…',
-        pricesUpdated: '✓ បានធ្វើបច្ចុប្បន្នភាព',
-        perTroyOz: '/ ត្រយ អោន',
-        priceByUnit: 'តម្លៃតាមឯកតា',
-        unitConverter: 'បម្លែងឯកតា',
-        myPurchases: 'ការទិញរបស់ខ្ញុំ',
-        addPurchase: 'បន្ថែម',
-        cancel: 'បោះបង់',
-        weight: 'ទម្ងន់',
-        unit: 'ឯកតា',
-        pricePaid: 'តម្លៃបង់',
-        date: 'កាលបរិច្ឆេទ',
-        save: 'រក្សាទុក',
-        edit: 'កែ',
-        delete: 'លុប',
-        paid: 'បង់',
-        current: 'បច្ចុប្បន្ន',
-        gainLoss: 'ចំណេញ/ខាត',
-        portfolioSummary: 'សង្ខេប',
-        totalInvested: 'វិនិយោគ',
-        currentValue: 'តម្លៃ',
-        totalGainLoss: 'ចំណេញ/ខាត',
-        exportCSV: 'នាំចេញ',
-        importCSV: 'នាំចូល',
-        enterWeight: 'ឧ. ២',
-        enterPrice: 'ឧ. ២៤០',
-        enterPriceFor: 'តម្លៃ',
-        apiHint: 'ស្រេចចិត្ត API key',
-        apiKeyPlaceholder: 'បិទភ្ជាប់ goldapi.io key…',
-        freeNoKey: 'ឥតគិតថ្លៃ',
-        asBackup: 'key ជាបម្រុង',
-        paste: 'បិទភ្ជាប់',
-        clear: 'លុប',
-        gram: 'ក្រាម', li: 'លី', hun: 'ហុន', chi: 'ជី',
-        damlung: 'ដំឡឹង', troyOunce: 'ត្រយ អោន', troyOz: 'ត្រយ អោន',
-        fetchPriceFirst: 'សូមទាញតម្លៃជាមុន',
-        offlineWarning: '⚠ ក្រៅបណ្តាញ',
-        noPurchases: 'មិនទាន់មានការទិញ។ ចុច + បន្ថែម',
+        title: 'តាមដានមាស', gold: 'មាស', live: 'បន្តផ្ទាល់', custom: 'កំណត់ផ្ទាល់',
+        refresh: 'ធ្វើបច្ចុប្បន្នភាព', loading: 'កំពុងផ្ទុក…', pricesUpdated: '✓ បានធ្វើបច្ចុប្បន្នភាព',
+        perTroyOz: '/ ត្រយ អោន', priceByUnit: 'តម្លៃតាមឯកតា', unitConverter: 'បម្លែងឯកតា',
+        myPurchases: 'ការទិញរបស់ខ្ញុំ', addPurchase: 'បន្ថែម', cancel: 'បោះបង់',
+        weight: 'ទម្ងន់', unit: 'ឯកតា', pricePaid: 'តម្លៃបង់', date: 'កាលបរិច្ឆេទ',
+        save: 'រក្សាទុក', edit: 'កែ', delete: 'លុប', paid: 'បង់', current: 'បច្ចុប្បន្ន',
+        gainLoss: 'ចំណេញ/ខាត', portfolioSummary: 'សង្ខេប', totalInvested: 'វិនិយោគ',
+        currentValue: 'តម្លៃ', totalGainLoss: 'ចំណេញ/ខាត', exportCSV: 'នាំចេញ',
+        importCSV: 'នាំចូល', enterWeight: 'ឧ. ២', enterPrice: 'ឧ. ២៤០',
+        enterPriceFor: 'តម្លៃ', apiHint: 'ស្រេចចិត្ត API key',
+        apiKeyPlaceholder: 'បិទភ្ជាប់ goldapi.io key…', freeNoKey: 'ឥតគិតថ្លៃ',
+        asBackup: 'key ជាបម្រុង', paste: 'បិទភ្ជាប់', clear: 'លុប',
+        gram: 'ក្រាម', li: 'លី', hun: 'ហុន', chi: 'ជី', damlung: 'ដំឡឹង',
+        troyOunce: 'ត្រយ អោន', troyOz: 'ត្រយ អោន', fetchPriceFirst: 'សូមទាញតម្លៃជាមុន',
+        offlineWarning: '⚠ ក្រៅបណ្តាញ', noPurchases: 'មិនទាន់មានការទិញ។ ចុច + បន្ថែម',
     }
 }
 const t = computed(() => translations[lang.value])
@@ -487,12 +569,90 @@ const allUnits = computed(() => [
     { key: 'damlung', label: 'Damlung', price: pricePerGram.value * DAMLUNG, gram: '37.5g' },
     { key: 'troyOz', label: 'Troy Oz', price: goldPrice.value || 0, gram: '31.1g' },
 ])
-
 const totalInvested = computed(() => purchases.value.reduce((s, p) => s + p.price, 0))
 const totalCurrent = computed(() => purchases.value.reduce((s, p) => s + currentValue(p), 0))
 const totalGL = computed(() => totalCurrent.value - totalInvested.value)
 
-// ─── Methods ─────────────────────────────────────────────────────────────────
+// ─── Ticker logic ─────────────────────────────────────────────────────────────
+let prevTickerStr = ''
+
+function buildTicker(price) {
+    if (!price) { tickerCols.value = []; return }
+    const str = price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const chars = str.split('')
+    const prev = prevTickerStr.split('')
+
+    tickerCols.value = chars.map((ch, i) => {
+        const isSep = ch === ',' || ch === '.'
+        const changed = ch !== prev[i]
+        if (isSep) {
+            return { chars: [ch], rolling: false, reelStyle: {}, isSep: true }
+        }
+        if (changed && prev[i] && !isSep) {
+            return {
+                chars: [prev[i] || ch, ch],
+                rolling: true,
+                reelStyle: { transform: 'translateY(0)' },
+                isSep: false,
+            }
+        }
+        return { chars: [ch], rolling: false, reelStyle: {}, isSep: false }
+    })
+
+    prevTickerStr = str
+
+    // animate rolling cols
+    nextTick(() => {
+        tickerCols.value.forEach((col, i) => {
+            if (col.rolling) {
+                setTimeout(() => {
+                    if (tickerCols.value[i]) {
+                        tickerCols.value[i].reelStyle = { transform: 'translateY(-50%)', transition: 'transform 0.4s cubic-bezier(0.16,1,0.3,1)' }
+                    }
+                    setTimeout(() => {
+                        if (tickerCols.value[i]) {
+                            tickerCols.value[i].chars = [col.chars[col.chars.length - 1]]
+                            tickerCols.value[i].reelStyle = {}
+                            tickerCols.value[i].rolling = false
+                        }
+                    }, 450)
+                }, i * 30)
+            }
+        })
+    })
+}
+
+watch(goldPrice, (val) => {
+    buildTicker(val)
+    triggerAccent()
+    triggerGemSpin()
+})
+
+// Fire confetti when portfolio crosses a positive milestone (0%, 5%, 10%, 25%, 50%)
+const MILESTONES = [0.001, 5, 10, 25, 50]
+watch(totalGL, (newGL, oldGL) => {
+    if (!totalInvested.value || totalInvested.value <= 0) return
+    const newPct = (newGL / totalInvested.value) * 100
+    const oldPct = oldGL != null ? (oldGL / totalInvested.value) * 100 : null
+    if (oldPct === null) return
+    for (const m of MILESTONES) {
+        if (oldPct < m && newPct >= m) { launchConfetti(); break }
+    }
+})
+
+// ─── Animation helpers ────────────────────────────────────────────────────────
+function triggerGemSpin() {
+    gemSpinning.value = false
+    nextTick(() => { gemSpinning.value = true })
+    setTimeout(() => { gemSpinning.value = false }, 700)
+}
+
+function triggerAccent() {
+    accentTrace.value = false
+    nextTick(() => { accentTrace.value = true })
+}
+
+// ─── Methods ──────────────────────────────────────────────────────────────────
 function today() { return new Date().toISOString().split('T')[0] }
 function toggleLang() { lang.value = lang.value === 'en' ? 'km' : 'en'; save() }
 function toggleDark() { isDark.value = !isDark.value; save() }
@@ -506,7 +666,6 @@ function fromGrams(g, u) {
 function convertUnit(val, from, to) { return fromGrams(toGrams(val, from), to).toFixed(4) }
 function currentValue(p) { return goldPrice.value ? pricePerGram.value * toGrams(p.weight, p.unit) : 0 }
 function gainLoss(p) { return currentValue(p) - p.price }
-function gainClass(p) { return gainLoss(p) >= 0 ? 'gain' : 'loss' }
 function formatDate(d) { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) }
 
 function flash(msg, type = 'success') {
@@ -536,8 +695,32 @@ async function pasteClipboard() {
     } catch { flash('Allow clipboard access or paste manually', 'error') }
 }
 
+// Simulate 3 ticking price changes, then do the real API call on the 4th tick
 async function fetchPrice() {
     loading.value = true
+    isLive.value = false
+
+    const base = goldPrice.value || 3300
+    const fakeDeltas = [
+        Math.round((Math.random() * 40 + 10) * (Math.random() > 0.5 ? 1 : -1) * 100) / 100,
+        Math.round((Math.random() * 40 + 10) * (Math.random() > 0.5 ? 1 : -1) * 100) / 100,
+        Math.round((Math.random() * 40 + 10) * (Math.random() > 0.5 ? 1 : -1) * 100) / 100,
+    ]
+
+    // tick 1
+    await new Promise(r => setTimeout(r, 750))
+    goldPrice.value = parseFloat((base + fakeDeltas[0]).toFixed(2))
+    lastUpdated.value = 'fetching…'
+
+    // tick 2
+    await new Promise(r => setTimeout(r, 750))
+    goldPrice.value = parseFloat((base + fakeDeltas[0] + fakeDeltas[1]).toFixed(2))
+
+    // tick 3
+    await new Promise(r => setTimeout(r, 750))
+    goldPrice.value = parseFloat((base + fakeDeltas[0] + fakeDeltas[1] + fakeDeltas[2]).toFixed(2))
+
+    // tick 4 — real API
     let ok = false
     try {
         const r = await fetch('https://api.gold-api.com/price/XAU', { mode: 'cors' })
@@ -562,7 +745,8 @@ async function fetchPrice() {
     }
 
     if (ok) {
-        lastUpdated.value = new Date().toLocaleTimeString()
+        isLive.value = true
+        lastUpdated.value = '✓ ' + new Date().toLocaleTimeString()
         save(); flash(t.value.pricesUpdated)
     } else {
         const cached = load()?.goldPrice
@@ -646,11 +830,7 @@ function load() { try { return JSON.parse(localStorage.getItem('gt4') || 'null')
 
 function handleOnline() { isOnline.value = true; fetchPrice() }
 function handleOffline() { isOnline.value = false }
-
-function handleScroll() {
-    // Show sticky price after scrolling past ~100px
-    showStickyPrice.value = window.scrollY > 100
-}
+function handleScroll() { showStickyPrice.value = window.scrollY > 100 }
 
 onMounted(() => {
     const d = load()
@@ -660,16 +840,26 @@ onMounted(() => {
         purchases.value = d.purchases || []; priceMethod.value = d.priceMethod || 'troyOz'
         customPrice.value = d.customPrice || null; customApiUrl.value = d.customApiUrl || ''
         priceSource.value = d.priceSource || 'api'
+        if (d.goldPrice) buildTicker(d.goldPrice)
     }
     if (priceSource.value === 'api') fetchPrice()
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
     window.addEventListener('scroll', handleScroll, { passive: true })
+    // idle detection for screensaver
+    const idleEvents = ['mousemove', 'keydown', 'touchstart', 'click']
+    idleEvents.forEach(e => window.addEventListener(e, resetIdleTimer, { passive: true }))
+    resetIdleTimer()
 })
 onBeforeUnmount(() => {
     window.removeEventListener('online', handleOnline)
     window.removeEventListener('offline', handleOffline)
     window.removeEventListener('scroll', handleScroll)
+    clearTimeout(idleTimer)
+    clearInterval(ssClockTimer)
+    cancelAnimationFrame(confettiAnimFrame)
+    const idleEvents = ['mousemove', 'keydown', 'touchstart', 'click']
+    idleEvents.forEach(e => window.removeEventListener(e, resetIdleTimer))
 })
 </script>
 
@@ -684,7 +874,6 @@ onBeforeUnmount(() => {
     padding: 0;
 }
 
-/* ── Design Tokens ── */
 .app {
     --gold: #F5C842;
     --gold-dim: #C08A10;
@@ -704,7 +893,6 @@ onBeforeUnmount(() => {
     --touch: 52px;
 }
 
-/* ── Dark theme (default) ── */
 .app.dark {
     --bg: #0C0C12;
     --surface: #13131C;
@@ -717,7 +905,6 @@ onBeforeUnmount(() => {
     --text-3: #5A576A;
 }
 
-/* ── Light theme ── */
 .app:not(.dark) {
     --bg: #F4F1EB;
     --surface: #FFFFFF;
@@ -733,7 +920,6 @@ onBeforeUnmount(() => {
     --gold-border: rgba(160, 110, 0, 0.25);
 }
 
-/* ── Base ── */
 .app {
     min-height: 100vh;
     background: var(--bg);
@@ -745,7 +931,7 @@ onBeforeUnmount(() => {
     overflow-x: hidden;
 }
 
-/* ── Ambient ── */
+/* ── Ambient orbs ── */
 .ambient {
     position: fixed;
     inset: 0;
@@ -779,8 +965,19 @@ onBeforeUnmount(() => {
     animation: drift 18s ease-in-out infinite alternate-reverse;
 }
 
+/* Orb pulse on fetch */
+.orb.fetching {
+    animation-duration: 0.8s !important;
+    opacity: 0.35 !important;
+    transition: opacity 0.3s;
+}
+
 .app:not(.dark) .orb {
     opacity: 0.08;
+}
+
+.app:not(.dark) .orb.fetching {
+    opacity: 0.18 !important;
 }
 
 @keyframes drift {
@@ -790,6 +987,40 @@ onBeforeUnmount(() => {
 
     to {
         transform: translate(20px, 30px) scale(1.08);
+    }
+}
+
+/* ── Gem coin spin ── */
+.logo-gem,
+.sticky-gem {
+    font-size: 22px;
+    color: var(--gold);
+    flex-shrink: 0;
+    line-height: 1;
+    display: inline-block;
+    transform-style: preserve-3d;
+}
+
+.logo-gem.spinning,
+.sticky-gem.spinning {
+    animation: coinSpin 0.65s ease-in-out forwards;
+}
+
+@keyframes coinSpin {
+    0% {
+        transform: rotateY(0deg) scale(1);
+    }
+
+    30% {
+        transform: rotateY(90deg) scale(0.7);
+    }
+
+    60% {
+        transform: rotateY(180deg) scale(0.7);
+    }
+
+    100% {
+        transform: rotateY(360deg) scale(1);
     }
 }
 
@@ -823,13 +1054,6 @@ onBeforeUnmount(() => {
     align-items: center;
     gap: 10px;
     min-width: 0;
-}
-
-.logo-gem {
-    font-size: 22px;
-    color: var(--gold);
-    flex-shrink: 0;
-    line-height: 1;
 }
 
 .logo-text {
@@ -918,11 +1142,6 @@ onBeforeUnmount(() => {
     transform: translateX(-50%) translateY(0);
 }
 
-.sticky-gem {
-    font-size: 12px;
-    color: var(--gold);
-}
-
 .sticky-val {
     font-size: 16px;
     font-weight: 800;
@@ -973,78 +1192,45 @@ onBeforeUnmount(() => {
     overflow: hidden;
 }
 
+/* ── Accent line trace ── */
 .card-accent {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     height: 2px;
+    background: var(--surface3);
+    overflow: hidden;
+}
+
+.accent-fill {
+    position: absolute;
+    inset: 0;
     background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    transform: translateX(-100%);
 }
 
-/* ── Segmented Control ── */
-.seg-ctrl {
-    display: flex;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 3px;
-    margin-bottom: 18px;
-    gap: 3px;
+.accent-fill.trace {
+    animation: traceLine 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.seg-btn {
-    flex: 1;
-    padding: 12px 12px;
-    border-radius: 8px;
-    border: none;
-    background: transparent;
-    color: var(--text-2);
-    font-family: var(--font);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
+@keyframes traceLine {
+    from {
+        transform: translateX(-100%);
+    }
+
+    to {
+        transform: translateX(0%);
+    }
 }
 
-.seg-btn.active {
-    background: var(--gold-alpha);
-    color: var(--gold);
-    border: 1px solid var(--gold-border);
-}
-
-/* ── Hero Price ── */
-.hero-price-block {
-    margin-bottom: 14px;
-}
-
-.hero-meta-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 4px;
-}
-
-.metal-tag {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-2);
-    letter-spacing: 0.04em;
-}
-
-.last-updated {
-    font-size: 11px;
-    color: var(--text-3);
-    font-family: var(--mono);
-}
-
-.hero-price {
+/* ── Digit Roll Ticker ── */
+.ticker-row {
     display: flex;
     align-items: baseline;
     gap: 2px;
     line-height: 1;
     margin-bottom: 4px;
-    perspective: 400px;
 }
 
 .price-dollar {
@@ -1052,22 +1238,59 @@ onBeforeUnmount(() => {
     font-weight: 800;
     color: var(--gold);
     align-self: flex-start;
-    margin-top: 4px;
+    margin-top: 6px;
 }
 
-.price-int {
+.digit-ticker {
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+}
+
+.digit-col {
+    overflow: hidden;
+    height: clamp(44px, 12vw, 72px);
+    line-height: clamp(44px, 12vw, 72px);
+    position: relative;
+}
+
+.digit-col.separator {
+    font-size: clamp(28px, 7vw, 48px);
+    font-weight: 800;
+    color: var(--gold);
+    font-family: var(--mono);
+    display: flex;
+    align-items: flex-end;
+    height: clamp(44px, 12vw, 72px);
+    padding-bottom: 2px;
+}
+
+.digit-reel {
+    display: flex;
+    flex-direction: column;
+    will-change: transform;
+}
+
+.digit-reel span {
+    display: block;
+    height: clamp(44px, 12vw, 72px);
+    line-height: clamp(44px, 12vw, 72px);
     font-size: clamp(44px, 12vw, 72px);
     font-weight: 800;
     color: var(--gold);
     letter-spacing: -2px;
     font-variant-numeric: tabular-nums;
+    font-family: var(--mono);
+    text-align: center;
+    min-width: clamp(26px, 7vw, 46px);
 }
 
-.price-dec {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--gold-dim);
-    letter-spacing: 0;
+.price-empty {
+    font-size: clamp(44px, 12vw, 72px);
+    font-weight: 800;
+    color: var(--gold);
+    letter-spacing: -2px;
+    font-family: var(--mono);
 }
 
 .price-unit-label {
@@ -1076,7 +1299,66 @@ onBeforeUnmount(() => {
     font-family: var(--mono);
 }
 
-/* ── Chips ── */
+/* ── Shimmer skeleton chips ── */
+.shimmer-chip {
+    flex-shrink: 0;
+    min-width: 72px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px;
+    position: relative;
+    overflow: hidden;
+}
+
+.shimmer-chip::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(245, 200, 66, 0.15) 50%,
+            transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.app:not(.dark) .shimmer-chip::after {
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(160, 110, 0, 0.12) 50%,
+            transparent 100%);
+    background-size: 200% 100%;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+.shimmer-line {
+    height: 10px;
+    background: var(--border-hi);
+    border-radius: 4px;
+    margin-bottom: 6px;
+}
+
+.shimmer-line.short {
+    width: 55%;
+}
+
+.shimmer-line.long {
+    height: 14px;
+    width: 75%;
+    margin-bottom: 0;
+}
+
+/* ── Real chips ── */
 .chips-scroll {
     display: flex;
     gap: 6px;
@@ -1158,14 +1440,14 @@ onBeforeUnmount(() => {
 }
 
 .flash.success {
-    background: rgba(34, 197, 94, 0.1);
-    border: 1px solid rgba(34, 197, 94, 0.3);
+    background: rgba(34, 197, 94, .1);
+    border: 1px solid rgba(34, 197, 94, .3);
     color: var(--gain);
 }
 
 .flash.error {
-    background: rgba(248, 113, 113, 0.1);
-    border: 1px solid rgba(248, 113, 113, 0.3);
+    background: rgba(248, 113, 113, .1);
+    border: 1px solid rgba(248, 113, 113, .3);
     color: var(--loss);
 }
 
@@ -1232,6 +1514,37 @@ onBeforeUnmount(() => {
     text-decoration: underline;
 }
 
+/* ── Seg ctrl ── */
+.seg-ctrl {
+    display: flex;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 3px;
+    margin-bottom: 18px;
+    gap: 3px;
+}
+
+.seg-btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-2);
+    font-family: var(--font);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.seg-btn.active {
+    background: var(--gold-alpha);
+    color: var(--gold);
+    border: 1px solid var(--gold-border);
+}
+
 /* ── Method Tabs ── */
 .method-tabs {
     display: flex;
@@ -1268,7 +1581,7 @@ onBeforeUnmount(() => {
     border: 1px solid var(--border);
     border-right: none;
     border-radius: 10px 0 0 10px;
-    padding: 14px 14px;
+    padding: 14px;
     font-size: 20px;
     color: var(--gold);
     font-family: var(--mono);
@@ -1281,7 +1594,7 @@ onBeforeUnmount(() => {
     border-radius: 0 10px 10px 0 !important;
 }
 
-/* ── Shared Inputs ── */
+/* ── Inputs ── */
 .text-input {
     background: var(--surface2);
     border: 1px solid var(--border);
@@ -1486,7 +1799,7 @@ onBeforeUnmount(() => {
     border: 1px solid var(--gold-border);
     border-right: none;
     border-radius: 10px 0 0 10px;
-    padding: 14px 14px;
+    padding: 14px;
     color: var(--gold);
     font-size: 13px;
     font-weight: 700;
@@ -1666,18 +1979,6 @@ onBeforeUnmount(() => {
     border-left: 3px solid var(--border);
 }
 
-.p-card.gain {
-    border-color: var(--gain-border);
-    background: var(--gain-bg);
-    border-left-color: var(--gain);
-}
-
-.p-card.loss {
-    border-color: var(--loss-border);
-    background: var(--loss-bg);
-    border-left-color: var(--loss);
-}
-
 .pcard-header {
     display: flex;
     justify-content: space-between;
@@ -1743,7 +2044,6 @@ onBeforeUnmount(() => {
     color: var(--loss);
 }
 
-/* GL Row — 3-column layout */
 .gl-row {
     display: flex;
     align-items: stretch;
@@ -1804,6 +2104,72 @@ onBeforeUnmount(() => {
     gap: 8px;
 }
 
+/* ── Hero price meta ── */
+.hero-price-block {
+    margin-bottom: 14px;
+}
+
+.hero-meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.metal-tag {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-2);
+    letter-spacing: 0.04em;
+}
+
+.last-updated {
+    font-size: 11px;
+    color: var(--text-3);
+    font-family: var(--mono);
+}
+
+.last-updated-wrap {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--gain);
+    flex-shrink: 0;
+    animation: livePulse 1.4s ease-in-out infinite;
+}
+
+@keyframes livePulse {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.4;
+        transform: scale(0.7);
+    }
+}
+
+.live-badge {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--gain);
+    background: var(--gain-bg);
+    border: 1px solid var(--gain-border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: var(--mono);
+}
+
 /* ── Summary ── */
 .summary {
     background: var(--surface2);
@@ -1826,7 +2192,7 @@ onBeforeUnmount(() => {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 10px 10px;
+    padding: 10px;
 }
 
 .sum-item.gain {
@@ -1871,26 +2237,50 @@ onBeforeUnmount(() => {
     color: var(--loss);
 }
 
+/* ── Liquid portfolio bar ── */
 .portfolio-bar {
-    height: 4px;
+    height: 6px;
     background: var(--surface3);
-    border-radius: 2px;
+    border-radius: 3px;
     overflow: hidden;
     margin-bottom: 6px;
 }
 
-.portfolio-fill {
+.liquid-fill {
     height: 100%;
-    border-radius: 2px;
-    transition: width 0.6s ease;
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+    transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.portfolio-fill.gain {
+.liquid-fill.gain {
     background: var(--gain);
 }
 
-.portfolio-fill.loss {
+.liquid-fill.loss {
     background: var(--loss);
+}
+
+.liquid-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 40px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    animation: liquidWave 1.6s ease-in-out infinite;
+}
+
+@keyframes liquidWave {
+    0% {
+        transform: translateX(-200%);
+    }
+
+    100% {
+        transform: translateX(400%);
+    }
 }
 
 .portfolio-pct {
@@ -1943,33 +2333,6 @@ onBeforeUnmount(() => {
 }
 
 /* ── Transitions ── */
-@keyframes priceFlipOut {
-    to {
-        opacity: 0;
-        transform: translateY(10px) rotateX(20deg);
-    }
-}
-
-@keyframes priceFlipIn {
-    from {
-        opacity: 0;
-        transform: translateY(-10px) rotateX(-20deg);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0) rotateX(0);
-    }
-}
-
-.price-flip-leave-active {
-    animation: priceFlipOut 0.18s ease-in forwards;
-}
-
-.price-flip-enter-active {
-    animation: priceFlipIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
 .fade-enter-active,
 .fade-leave-active {
     transition: opacity 0.3s;
@@ -2037,7 +2400,203 @@ onBeforeUnmount(() => {
     }
 }
 
-/* ── Safe area (iPhone notch/home bar) ── */
+/* ── Screensaver ── */
+.screensaver {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+    background: #08080F;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.ss-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+}
+
+.ss-orb1 {
+    width: 360px;
+    height: 360px;
+    background: #F5C842;
+    opacity: 0.08;
+    top: -80px;
+    right: -60px;
+    animation: ssOrb 12s ease-in-out infinite alternate;
+}
+
+.ss-orb2 {
+    width: 260px;
+    height: 260px;
+    background: #A07020;
+    opacity: 0.07;
+    bottom: -40px;
+    left: -40px;
+    animation: ssOrb 16s ease-in-out infinite alternate-reverse;
+}
+
+.ss-orb3 {
+    width: 160px;
+    height: 160px;
+    background: #F5C842;
+    opacity: 0.05;
+    bottom: 30%;
+    right: 10%;
+    animation: ssOrb 20s ease-in-out infinite alternate;
+}
+
+@keyframes ssOrb {
+    from {
+        transform: translate(0, 0) scale(1);
+    }
+
+    to {
+        transform: translate(24px, 32px) scale(1.15);
+    }
+}
+
+.ss-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    z-index: 1;
+}
+
+.ss-gem {
+    font-size: 28px;
+    color: rgba(245, 200, 66, 0.4);
+    animation: ssGemPulse 4s ease-in-out infinite;
+    margin-bottom: 4px;
+}
+
+@keyframes ssGemPulse {
+
+    0%,
+    100% {
+        opacity: 0.4;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.8;
+        transform: scale(1.08);
+    }
+}
+
+.ss-time {
+    font-size: clamp(56px, 16vw, 96px);
+    font-weight: 800;
+    color: #F5C842;
+    letter-spacing: -3px;
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    animation: ssTimePulse 2s ease-in-out infinite;
+}
+
+@keyframes ssTimePulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    49% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.6;
+    }
+
+    51% {
+        opacity: 1;
+    }
+}
+
+.ss-price {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin-top: 6px;
+}
+
+.ss-price-val {
+    font-size: clamp(22px, 6vw, 36px);
+    font-weight: 800;
+    color: rgba(245, 200, 66, 0.85);
+    font-family: var(--mono);
+    letter-spacing: -1px;
+}
+
+.ss-price-unit {
+    font-size: 11px;
+    color: rgba(245, 200, 66, 0.35);
+    font-family: var(--mono);
+    letter-spacing: 0.2em;
+}
+
+.ss-date {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.2);
+    font-family: var(--font);
+    margin-top: 4px;
+    letter-spacing: 0.04em;
+}
+
+.ss-tap {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.12);
+    letter-spacing: 0.2em;
+    font-family: var(--mono);
+    margin-top: 24px;
+    animation: ssTapBlink 3s ease-in-out infinite;
+}
+
+@keyframes ssTapBlink {
+
+    0%,
+    100% {
+        opacity: 0.12;
+    }
+
+    50% {
+        opacity: 0.35;
+    }
+}
+
+.ss-fade-enter-active {
+    transition: opacity 0.5s ease;
+}
+
+.ss-fade-leave-active {
+    transition: opacity 0.4s ease;
+}
+
+.ss-fade-enter-from,
+.ss-fade-leave-to {
+    opacity: 0;
+}
+
+/* ── Confetti Canvas ── */
+.confetti-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 998;
+    pointer-events: none;
+    display: none;
+    width: 100%;
+    height: 100%;
+}
+
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
     .main {
         padding-bottom: calc(72px + env(safe-area-inset-bottom));
