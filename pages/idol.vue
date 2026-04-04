@@ -714,20 +714,28 @@ import { normalizeArtists } from '~/utils/artistHelpers.js'
 // ── useCodeParser ────────────────────────────────────────────────────────────
 function useCodeParser() {
   const cache = new Map()
+  const CODE_PREFIXES = {
+    'abp': '118',
+    'abw': '118',
+    'start': '1',
+  }
   function parseCode(code) {
     if (!code) return null
     if (cache.has(code)) return cache.get(code)
     const clean = code.toUpperCase().replace(/[^A-Z0-9]/g, '')
     const m = clean.match(/^(.*?)(\d+)$/)
     if (!m || !m[2]) {
-      const r = { full: clean, prefix: clean.toLowerCase(), number: '001', rawNumber: 1, paddedNumber: '00001', id: clean.toLowerCase() + '00001' }
+      const prefix = clean.toLowerCase()
+      const pfx = CODE_PREFIXES[prefix] || ''
+      const r = { full: clean, prefix, number: '001', rawNumber: 1, paddedNumber: '00001', id: pfx + prefix + '00001' }
       cache.set(code, r); return r
     }
     const prefix = m[1].toLowerCase()
     const number = m[2]
     const rawNumber = parseInt(number, 10)
     const paddedNumber = number.length >= 5 ? number : ('00000' + number).slice(-5)
-    const id = prefix + paddedNumber
+    const pfx = CODE_PREFIXES[prefix] || ''
+    const id = pfx + prefix + paddedNumber
     const r = { full: clean, prefix, number, rawNumber, paddedNumber, id }
     cache.set(code, r)
     return r
@@ -1266,6 +1274,23 @@ function getArtistProgress(artist) {
 function getProgressiveImage(artist) { const cw = getCoverWork(artist); return cw ? getProgressiveWorkImage(cw) : { full: null } }
 
 // FIX 10: skip URLs that have already 404'd
+// Custom image host configs: prefix → { base, path }
+// Cover: {base}/{path}/{prefix}/{rawNumber}/pb_e_{prefix}-{rawNumber}.jpg
+// Gallery: {base}/{path}/{prefix}/{rawNumber}/cap_e_{n}_{prefix}-{rawNumber}.jpg
+const CUSTOM_HOSTS = {
+  'abf': { base: 'https://image.mgstage.com', path: 'images/prestige' },
+  '300mium': { base: 'https://pics.pornfhd.com', path: 'mgs/images/prestigepremium' },
+  '259luxu': { base: 'https://pics.pornfhd.com', path: 'mgs/images/luxutv' },
+}
+
+function getCustomHostUrl(host, prefix, rawNumber, quality) {
+  if (quality && quality !== 'pl') {
+    const n = quality.split('-')[1] || '1'
+    return `${host.base}/${host.path}/${prefix}/${rawNumber}/cap_e_${n}_${prefix}-${rawNumber}.jpg`
+  }
+  return `${host.base}/${host.path}/${prefix}/${rawNumber}/pb_e_${prefix}-${rawNumber}.jpg`
+}
+
 function getProgressiveWorkImage(work) {
   if (!work) return { full: null }
   if (customImages.value[work.code]) {
@@ -1274,7 +1299,10 @@ function getProgressiveWorkImage(work) {
   }
   const p = parseCode(work.code)
   if (!p || !p.id || p.id.length < 3) return { full: null }
-  const url = `https://pics.dmm.co.jp/digital/video/${p.id}/${p.id}pl.jpg`
+  const host = CUSTOM_HOSTS[p.prefix]
+  const url = host
+    ? getCustomHostUrl(host, p.prefix, p.rawNumber)
+    : `https://pics.dmm.co.jp/digital/video/${p.id}/${p.id}pl.jpg`
   return failedImageUrls.value.has(url) ? { full: null } : { full: url }
 }
 
@@ -1282,6 +1310,8 @@ function getImageUrl(code, quality) {
   if (!quality) quality = 'pl'
   if (quality === 'pl' && customImages.value[code]) return customImages.value[code]
   const p = parseCode(code); if (!p || !p.id || p.id.length < 3) return null
+  const host = CUSTOM_HOSTS[p.prefix]
+  if (host) return getCustomHostUrl(host, p.prefix, p.rawNumber, quality)
   if (quality !== 'pl') {
     const n = quality.split('-')[1] || '1'
     return `https://pics.dmm.co.jp/digital/video/${p.id}/${p.id}jp-${n}.jpg`
