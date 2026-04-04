@@ -1278,20 +1278,21 @@ function getProgressiveImage(artist) { const cw = getCoverWork(artist); return c
 
 // FIX 10: skip URLs that have already 404'd
 // Custom image host configs: prefix → { base, path }
-// Cover: {base}/{path}/{prefix}/{rawNumber}/pb_e_{prefix}-{rawNumber}.jpg
-// Gallery: {base}/{path}/{prefix}/{rawNumber}/cap_e_{n}_{prefix}-{rawNumber}.jpg
+// Cover: {base}/{path}/{prefix}/{number}/pb_e_{prefix}-{number}.jpg
+// Gallery: {base}/{path}/{prefix}/{number}/cap_e_{n}_{prefix}-{number}.jpg
 const CUSTOM_HOSTS = {
   'abf': { base: 'https://image.mgstage.com', path: 'images/prestige' },
+  'abw': { base: 'https://image.mgstage.com', path: 'images/prestige' },
   '300mium': { base: 'https://pics.pornfhd.com', path: 'mgs/images/prestigepremium' },
   '259luxu': { base: 'https://pics.pornfhd.com', path: 'mgs/images/luxutv' },
 }
 
-function getCustomHostUrl(host, prefix, rawNumber, quality) {
+function getCustomHostUrl(host, prefix, number, quality) {
   if (quality && quality !== 'pl') {
     const n = quality.split('-')[1] || '1'
-    return `${host.base}/${host.path}/${prefix}/${rawNumber}/cap_e_${n}_${prefix}-${rawNumber}.jpg`
+    return `${host.base}/${host.path}/${prefix}/${number}/cap_e_${n}_${prefix}-${number}.jpg`
   }
-  return `${host.base}/${host.path}/${prefix}/${rawNumber}/pb_e_${prefix}-${rawNumber}.jpg`
+  return `${host.base}/${host.path}/${prefix}/${number}/pb_e_${prefix}-${number}.jpg`
 }
 
 function getProgressiveWorkImage(work) {
@@ -1304,7 +1305,7 @@ function getProgressiveWorkImage(work) {
   if (!p || !p.id || p.id.length < 3) return { full: null }
   const host = CUSTOM_HOSTS[p.prefix]
   const url = host
-    ? getCustomHostUrl(host, p.prefix, p.rawNumber)
+    ? getCustomHostUrl(host, p.prefix, p.number)
     : `https://pics.dmm.co.jp/digital/video/${p.id}/${p.id}pl.jpg`
   return failedImageUrls.value.has(url) ? { full: null } : { full: url }
 }
@@ -1314,7 +1315,7 @@ function getImageUrl(code, quality) {
   if (quality === 'pl' && customImages.value[code]) return customImages.value[code]
   const p = parseCode(code); if (!p || !p.id || p.id.length < 3) return null
   const host = CUSTOM_HOSTS[p.prefix]
-  if (host) return getCustomHostUrl(host, p.prefix, p.rawNumber, quality)
+  if (host) return getCustomHostUrl(host, p.prefix, p.number, quality)
   if (quality !== 'pl') {
     const n = quality.split('-')[1] || '1'
     return `https://pics.dmm.co.jp/digital/video/${p.id}/${p.id}jp-${n}.jpg`
