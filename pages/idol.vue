@@ -717,7 +717,10 @@ function useCodeParser() {
   const CODE_PREFIXES = {
     'abp': '118',
     'abw': '118',
+    'chn': '118',
+    'bgn': '118',
     'start': '1',
+    'dldss': '1',
   }
   function parseCode(code) {
     if (!code) return null
@@ -824,7 +827,7 @@ const viewTransition = ref('slide-right')
 const activeTab = ref('')
 const searchQuery = ref('')
 const artistSortBy = ref('nameAsc')
-const workSortBy = ref('default')
+const workSortBy = ref('codeAsc')
 const viewFilters = ref({ artists: 'all', works: 'all' })
 const compactWorks = ref(false)
 const artists = ref(normalizeArtists(JSON.parse(JSON.stringify(DEFAULT_ARTISTS))))
@@ -1354,7 +1357,7 @@ function selectArtist(name) {
   // FIX 17: Set mutation — always reassign for reactivity
   if (!viewedArtists.value.has(name)) viewedArtists.value = new Set([...viewedArtists.value, name])
   activeTab.value = name; currentView.value = 'works'
-  searchQuery.value = ''; workSortBy.value = 'default'
+  searchQuery.value = ''; workSortBy.value = 'codeAsc'
   gridGeneration.value++
   nextTick(() => window.scrollTo({ top: 0, behavior: 'instant' }))
 }
@@ -1813,7 +1816,7 @@ function globalGoToWork({ work, artist }) {
     if (!viewedArtists.value.has(artist.name)) viewedArtists.value = new Set([...viewedArtists.value, artist.name])
     activeTab.value = artist.name
     currentView.value = 'works'
-    searchQuery.value = ''; workSortBy.value = 'default'
+    searchQuery.value = ''; workSortBy.value = 'codeAsc'
     gridGeneration.value++
   }
   nextTick(() => openWorkView(work))
