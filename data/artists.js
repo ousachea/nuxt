@@ -12,6 +12,20 @@ export const DEFAULT_ARTISTS = [
       mainWorks: ['___',]
     },
     {
+      name: 'Nami Hoshino 星野ナミ',
+      cover: 'SSNI-078',
+      url: '',  // Custom cover
+      compilations: [''],
+      mainWorks: ['HODV-20817','SSNI-453','SSNI-345','SSNI-078','SSNI-055','SNIS-685','SNIS-418','SNIS-439','SNIS-309','SNIS-462','SNIS-090','SNIS-026']
+    },
+    {
+      name: 'Tia ティア',
+      cover: '',
+      url: '',  // Custom cover
+      compilations: [''],
+      mainWorks: ['SNIS-300','SNIS-427','SNIS-340']
+    },
+    {
       name: 'Non Ohana 小花のん',
       cover: '',
       url: '',  // Custom cover
@@ -239,7 +253,7 @@ export const DEFAULT_ARTISTS = [
     {
       name: 'Aika Yumeno', cover: '',
       url: '',  // Custom cover
-      compilations: [''], mainWorks: ['SNIS-413', 'SNIS-477', 'SNIS-659', 'SONE-874', 'SSNI-304','SNOS-159','SNOS-199']
+      compilations: [''], mainWorks: ['SNIS-413', 'SNIS-477', 'SNIS-659', 'SONE-874', 'SSNI-304','SNOS-159','SNOS-199','SONE-849','SSNI-867','SSNI-568','SSNI-391','SNIS-876','SNIS-677','SNIS-237','SOE-988','SONE-592']
     },
     {
       name: 'Aiko Kimura', cover: '',
@@ -515,7 +529,7 @@ export const DEFAULT_ARTISTS = [
     {
       name: 'Touka Rinne', cover: '',
       url: '',  // Custom cover
-      compilations: [''], mainWorks: ['JUY-603', 'JUY-984', 'KTB-030', 'MVSD-383', 'PPPD-715', 'PPPD-754', 'MAAN-387','GANA-1996']
+      compilations: ['PPBD-166'], mainWorks: ['JUY-603', 'JUY-984', 'KTB-030', 'MVSD-383', 'PPPD-715', 'PPPD-754', 'MAAN-387','GANA-1996','HND-727','HND-685','CJOD-192','MRSS-070','MIAA-075','HND-659','MEYD-490','PPPD-715','HMGL-173']
     },
     {
       name: 'Umika Minamizawa', cover: '',
