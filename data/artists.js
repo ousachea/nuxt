@@ -320,7 +320,7 @@ export const DEFAULT_ARTISTS = [
     {
       name: 'Hitomi Tanaka', cover: 'MIMK-007',
       url: '',  // Custom cover
-      compilations: [''], mainWorks: ['ATID-192', 'DASD-132', 'MDYD-895', 'MDYD-940', 'MDYD-971', 'MIDE-184', 'MIDD-933', 'MIMK-007', 'PPPD-441', 'PPPD-618', 'PPPD-628', 'PPPD-663', 'PPPD-671', 'PPPD-703', 'PPPD-752', 'PPPD-818', 'PPPD-824', 'PPPD-835', 'PPPD-867', 'PPPD-881', 'PPPD-996']
+      compilations: [''], mainWorks: ['ATID-192', 'PPVR-009','PPPD-867','PPPD-703','DASD-132', 'MDYD-895', 'MDYD-940', 'MDYD-971', 'MIDE-184', 'MIDD-933', 'MIMK-007', 'PPPD-441', 'PPPD-618', 'PPPD-628', 'PPPD-663', 'PPPD-671', 'PPPD-703', 'PPPD-752', 'PPPD-818', 'PPPD-824', 'PPPD-835', 'PPPD-867', 'PPPD-881', 'PPPD-996']
     },
     {
       name: 'Hoshino Nami', cover: '',
