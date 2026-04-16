@@ -196,33 +196,16 @@
 
                 <!-- ── PASSWORD GATE ── -->
                 <div v-if="purchasesLocked" class="pw-gate">
-                    <!-- Set new password -->
-                    <div v-if="!hasPwSet || isSettingPw" class="pw-box">
-                        <div class="pw-icon">🔐</div>
-                        <p class="pw-title">{{ isSettingPw ? t.changePw : t.setPw }}</p>
-                        <input v-model="pwInput" class="text-input" type="password"
-                            :placeholder="t.newPwPlaceholder" @keyup.enter="setupPassword" autocomplete="new-password" />
-                        <input v-model="pwConfirm" class="text-input" type="password"
-                            :placeholder="t.confirmPw" @keyup.enter="setupPassword" autocomplete="new-password" />
-                        <transition name="fade">
-                            <p v-if="pwError" class="pw-error">{{ pwError }}</p>
-                        </transition>
-                        <button class="primary-btn full-btn" @click="setupPassword">✦ {{ t.setPwBtn }}</button>
-                        <button v-if="isSettingPw" class="ghost-btn full-btn" @click="isSettingPw = false; pwError = ''">{{ t.cancel }}</button>
-                    </div>
-
-                    <!-- Unlock -->
-                    <div v-else class="pw-box">
+                    <div class="pw-box">
                         <div class="pw-icon">🔒</div>
                         <p class="pw-title">{{ t.locked }}</p>
+                        <p class="pw-sub">{{ t.pwSub }}</p>
                         <input v-model="pwInput" class="text-input" type="password"
                             :placeholder="t.enterPw" @keyup.enter="unlockPurchases" autocomplete="current-password" />
                         <transition name="fade">
                             <p v-if="pwError" class="pw-error">{{ pwError }}</p>
                         </transition>
                         <button class="primary-btn full-btn" @click="unlockPurchases">{{ t.unlock }}</button>
-                        <button class="ghost-btn full-btn" style="margin-top:4px"
-                            @click="isSettingPw = true; pwError = ''; pwInput = ''">{{ t.changePw }}</button>
                     </div>
                 </div>
 
@@ -425,10 +408,9 @@ const csvInput = ref(null)
 
 // ─── Password State ───────────────────────────────────────────────────────────
 const purchasesLocked = ref(true)
+const isOwner = ref(false)
 const pwInput = ref('')
-const pwConfirm = ref('')
 const pwError = ref('')
-const isSettingPw = ref(false)
 
 // ─── i18n ────────────────────────────────────────────────────────────────────
 const translations = {
@@ -477,14 +459,10 @@ const translations = {
         offlineWarning: 'You are offline — prices may be outdated',
         noPurchases: 'No purchases yet. Tap + Add above.',
         lock: 'Lock purchases',
-        locked: 'Purchases locked',
+        locked: 'Enter password to view purchases',
+        pwSub: 'Use your own password to see your purchases, or the shared password to see shared purchases.',
         unlock: 'Unlock',
-        setPw: 'Set a password to protect your purchases',
-        setPwBtn: 'Set Password',
-        changePw: 'Change password',
-        newPwPlaceholder: 'New password (min 4 chars)',
-        confirmPw: 'Confirm password',
-        enterPw: 'Enter password',
+        enterPw: 'Enter any password…',
     },
     km: {
         title: 'តាមដានមាស',
@@ -531,20 +509,13 @@ const translations = {
         offlineWarning: '⚠ ក្រៅបណ្តាញ',
         noPurchases: 'មិនទាន់មានការទិញ។ ចុច + បន្ថែម',
         lock: 'ចាក់សោ',
-        locked: 'ការទិញត្រូវបានចាក់សោ',
+        locked: 'បញ្ចូលពាក្យសម្ងាត់ដើម្បីមើលការទិញ',
+        pwSub: 'ប្រើពាក្យសម្ងាត់របស់អ្នក ឬពាក្យសម្ងាត់រួម។',
         unlock: 'ដោះសោ',
-        setPw: 'កំណត់ពាក្យសម្ងាត់ដើម្បីការពារការទិញ',
-        setPwBtn: 'កំណត់ពាក្យសម្ងាត់',
-        changePw: 'ផ្លាស់ប្តូរពាក្យសម្ងាត់',
-        newPwPlaceholder: 'ពាក្យសម្ងាត់ថ្មី (យ៉ាងហោចណាស់ ៤)',
-        confirmPw: 'បញ្ជាក់ពាក្យសម្ងាត់',
-        enterPw: 'បញ្ចូលពាក្យសម្ងាត់',
+        enterPw: 'បញ្ចូលពាក្យសម្ងាត់…',
     }
 }
 const t = computed(() => translations[lang.value])
-
-// ─── Password Computed ────────────────────────────────────────────────────────
-const hasPwSet = computed(() => !!localStorage.getItem('gt4_pwhash'))
 
 // ─── Price computations ───────────────────────────────────────────────────────
 const pricePerGram = computed(() => goldPrice.value ? goldPrice.value / TROY : 0)
@@ -618,47 +589,38 @@ async function sha256(str) {
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-async function setupPassword() {
-    if (!pwInput.value || pwInput.value.length < 4) {
-        pwError.value = 'Min 4 characters'; return
-    }
-    if (pwInput.value !== pwConfirm.value) {
-        pwError.value = 'Passwords do not match'; return
-    }
+async function unlockPurchases() {
+    if (!pwInput.value) { pwError.value = 'Enter a password'; return }
     const hash = await sha256(pwInput.value)
-    localStorage.setItem('gt4_pwhash', hash)
+
+    if (hash === OWNER_PW_HASH) {
+        // Owner — pre-purchases + any extras they added
+        isOwner.value = true
+        const extra = JSON.parse(localStorage.getItem('gt4_owner_extra') || '[]')
+        purchases.value = [...PRE_PURCHASES, ...extra]
+    } else {
+        // Regular user — their own purchases stored under their password hash key
+        isOwner.value = false
+        const userKey = 'gt4_u_' + hash.slice(0, 16)
+        sessionStorage.setItem('gt4_ukey', userKey) // remember key for this session
+        purchases.value = JSON.parse(localStorage.getItem(userKey) || '[]')
+    }
+
     purchasesLocked.value = false
-    isSettingPw.value = false
-    pwInput.value = ''; pwConfirm.value = ''; pwError.value = ''
-    flash('✓ Password set')
+    pwInput.value = ''; pwError.value = ''
 }
 
-async function unlockPurchases() {
-    if (!pwInput.value) { pwError.value = 'Enter your password'; return }
-    const hash = await sha256(pwInput.value)
-    if (hash === localStorage.getItem('gt4_pwhash')) {
-        // If owner password — merge pre-purchases (avoid duplicates)
-        if (hash === OWNER_PW_HASH) {
-            const existingIds = new Set(purchases.value.map(p => p.id))
-            const toAdd = PRE_PURCHASES.filter(p => !existingIds.has(p.id))
-            if (toAdd.length) { purchases.value = [...toAdd, ...purchases.value]; save() }
-        }
-        purchasesLocked.value = false
-        pwInput.value = ''; pwError.value = ''
-    } else {
-        pwError.value = 'Wrong password'
-        pwInput.value = ''
-    }
+function lockPurchases() {
+    purchasesLocked.value = true
+    isOwner.value = false
+    purchases.value = []
+    pwInput.value = ''; pwError.value = ''
+    sessionStorage.removeItem('gt4_ukey')
 }
 
 function scrollToPurchases() {
     const el = document.getElementById('purchases-section')
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-
-function lockPurchases() {
-    purchasesLocked.value = true
-    pwInput.value = ''; pwError.value = ''; isSettingPw.value = false
 }
 
 // ─── Price Fetch ──────────────────────────────────────────────────────────────
@@ -762,12 +724,23 @@ function importCSV(e) {
 // ─── Persistence ──────────────────────────────────────────────────────────────
 function save() {
     try {
+        // Save app settings
         localStorage.setItem('gt4', JSON.stringify({
             lang: lang.value, isDark: isDark.value, goldPrice: goldPrice.value,
-            lastUpdated: lastUpdated.value, purchases: purchases.value,
-            priceMethod: priceMethod.value, customPrice: customPrice.value,
-            customApiUrl: customApiUrl.value, priceSource: priceSource.value,
+            lastUpdated: lastUpdated.value, priceMethod: priceMethod.value,
+            customPrice: customPrice.value, customApiUrl: customApiUrl.value,
+            priceSource: priceSource.value,
         }))
+        // Save purchases per user type
+        if (!purchasesLocked.value) {
+            if (isOwner.value) {
+                const extra = purchases.value.filter(p => !PRE_PURCHASES.find(pp => pp.id === p.id))
+                localStorage.setItem('gt4_owner_extra', JSON.stringify(extra))
+            } else {
+                const userKey = sessionStorage.getItem('gt4_ukey')
+                if (userKey) localStorage.setItem(userKey, JSON.stringify(purchases.value))
+            }
+        }
     } catch { }
 }
 function load() { try { return JSON.parse(localStorage.getItem('gt4') || 'null') } catch { return null } }
@@ -781,12 +754,12 @@ onMounted(() => {
     if (d) {
         lang.value = d.lang || 'en'; isDark.value = d.isDark ?? true
         goldPrice.value = d.goldPrice || null; lastUpdated.value = d.lastUpdated || ''
-        purchases.value = d.purchases || []; priceMethod.value = d.priceMethod || 'troyOz'
+        priceMethod.value = d.priceMethod || 'troyOz'
         customPrice.value = d.customPrice || null; customApiUrl.value = d.customApiUrl || ''
         priceSource.value = d.priceSource || 'api'
     }
-    // Lock if a password has been set
-    purchasesLocked.value = !!localStorage.getItem('gt4_pwhash')
+    // Always start locked — user must enter password to see purchases
+    purchasesLocked.value = true
     if (priceSource.value === 'api') fetchPrice()
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
@@ -1647,6 +1620,14 @@ onBeforeUnmount(() => {
     text-align: center;
     margin-bottom: 4px;
     line-height: 1.4;
+}
+
+.pw-sub {
+    font-size: 12px;
+    color: var(--text-3);
+    text-align: center;
+    line-height: 1.5;
+    margin-bottom: 4px;
 }
 
 .pw-error {
