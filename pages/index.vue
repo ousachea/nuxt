@@ -37,8 +37,17 @@
         <!-- Sticky Price Pill -->
         <div class="sticky-price" :class="{ visible: showStickyPrice && goldPrice }">
             <span class="sticky-gem">◈</span>
-            <span class="sticky-val">${{ goldPrice?.toFixed(2) ?? '——' }}</span>
-            <span class="sticky-unit">/ oz</span>
+            <div class="sticky-prices">
+                <div class="sticky-row-main">
+                    <span class="sticky-val">${{ goldPrice?.toFixed(2) ?? '——' }}</span>
+                    <span class="sticky-unit">/ troy oz</span>
+                </div>
+                <div class="sticky-row-sub" v-if="goldPrice">
+                    <span class="sticky-val-sub">${{ (goldPrice / 31.1035 * 37.5).toFixed(2) }}</span>
+                    <span class="sticky-unit-sub">/ damlung</span>
+                </div>
+            </div>
+            <div class="sticky-divider" v-if="goldPrice"></div>
             <button class="sticky-refresh" @click="fetchPrice" :disabled="loading">↻</button>
         </div>
 
@@ -68,7 +77,7 @@
                     <transition name="price-flip" mode="out-in">
                         <div class="hero-price" :key="goldPrice?.toFixed(0) ?? 'null'">
                             <span class="price-dollar">$</span>
-                            <span class="price-int">{{ goldPrice ? Math.floor(goldPrice).toLocaleString() : '——' }}</span>
+                            <span class="price-int">{{ animatedPrice ? Math.floor(animatedPrice).toLocaleString() : '——' }}</span>
                             <span v-if="goldPrice" class="price-dec">.{{ (goldPrice % 1).toFixed(2).slice(2) }}</span>
                         </div>
                     </transition>
@@ -76,8 +85,9 @@
                 </div>
 
                 <!-- Per-unit chips -->
-                <div v-if="goldPrice" class="chips-scroll">
-                    <div v-for="u in priceUnits" :key="u.key" class="chip">
+                <div v-if="goldPrice" class="chips-scroll" :key="goldPrice">
+                    <div v-for="(u, idx) in priceUnits" :key="u.key" class="chip chip-shimmer" :style="{ animationDelay: (idx * 0.08) + 's' }">
+                        <div class="shimmer-line"></div>
                         <span class="chip-label">{{ t[u.key] || u.label }}</span>
                         <span class="chip-price">${{ u.price < 1 ? u.price.toFixed(4) : u.price.toFixed(2) }}</span>
                     </div>
@@ -181,7 +191,7 @@
             </section>
 
             <!-- ── PURCHASES ── -->
-            <section class="card" id="purchases-section">
+            <section class="card" id="purchases-section" :class="{ 'section-glow': purchasesGlow }">
                 <div class="section-header">
                     <h2 class="section-title">{{ t.myPurchases }}</h2>
                     <div class="section-actions">
@@ -197,7 +207,11 @@
                 <!-- ── PASSWORD GATE ── -->
                 <div v-if="purchasesLocked" class="pw-gate">
                     <div class="pw-box">
-                        <div class="pw-icon">🔒</div>
+                        <div class="burst-ring-wrap" :class="{ burst: pwUnlockBurst }">
+                            <div class="burst-r1"></div>
+                            <div class="burst-r2"></div>
+                            <div class="pw-icon" :class="{ shake: pwShake }">🔒</div>
+                        </div>
                         <p class="pw-title">{{ t.locked }}</p>
                         <p class="pw-sub">{{ t.pwSub }}</p>
                         <input v-model="pwInput" class="text-input" type="password"
@@ -249,10 +263,11 @@
 
                     <!-- Purchase Cards -->
                     <div v-if="purchases.length" class="purchases-list">
-                        <div v-for="(p, i) in purchases" :key="p.id" class="p-card" :style="{
+                        <div v-for="(p, i) in purchases" :key="p.id" class="p-card p-card-stagger" :style="{
                             borderLeftColor: gainLoss(p) >= 0 ? 'var(--gain)' : 'var(--loss)',
                             borderColor: gainLoss(p) >= 0 ? 'var(--gain-border)' : 'var(--loss-border)',
-                            background: gainLoss(p) >= 0 ? 'var(--gain-bg)' : 'var(--loss-bg)'
+                            background: gainLoss(p) >= 0 ? 'var(--gain-bg)' : 'var(--loss-bg)',
+                            animationDelay: (i * 0.07) + 's'
                         }">
                             <template v-if="editIdx !== i">
                                 <!-- Card Header -->
@@ -279,7 +294,7 @@
                                     </div>
                                     <div class="gl-divider" />
                                     <div class="gl-col">
-                                        <span class="gl-label">{{ t.gainLoss }}</span>
+                                        <span class="gl-label" :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">{{ gainLoss(p) >= 0 ? t.gain : t.loss }}</span>
                                         <span class="gl-val gl-main" :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">
                                             {{ gainLoss(p) >= 0 ? '+' : '' }}${{ gainLoss(p).toFixed(2) }}
                                         </span>
@@ -359,7 +374,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TROY = 31.1035
@@ -406,11 +421,36 @@ const editIdx = ref(null)
 const editDraft = ref({})
 const csvInput = ref(null)
 
+// ─── Animation State ─────────────────────────────────────────────────────────
+const animatedPrice = ref(null)
+let priceCounterTimer = null
+
+function animateCounterTo(target) {
+    if (priceCounterTimer) clearInterval(priceCounterTimer)
+    const start = animatedPrice.value || 0
+    const duration = 900
+    const step = 16
+    const totalSteps = duration / step
+    const increment = (target - start) / totalSteps
+    let current = start
+    priceCounterTimer = setInterval(() => {
+        current += increment
+        if ((increment > 0 && current >= target) || (increment < 0 && current <= target)) {
+            current = target
+            clearInterval(priceCounterTimer)
+        }
+        animatedPrice.value = current
+    }, step)
+}
+
 // ─── Password State ───────────────────────────────────────────────────────────
 const purchasesLocked = ref(true)
 const isOwner = ref(false)
 const pwInput = ref('')
 const pwError = ref('')
+const pwShake = ref(false)
+const pwUnlockBurst = ref(false)
+const purchasesGlow = ref(false)
 
 // ─── i18n ────────────────────────────────────────────────────────────────────
 const translations = {
@@ -438,6 +478,8 @@ const translations = {
         paid: 'Paid',
         current: 'Current',
         gainLoss: 'G / L',
+        gain: 'Gain',
+        loss: 'Loss',
         portfolioSummary: 'Portfolio',
         totalInvested: 'Invested',
         currentValue: 'Value Now',
@@ -488,6 +530,8 @@ const translations = {
         paid: 'បង់',
         current: 'បច្ចុប្បន្ន',
         gainLoss: 'ចំណេញ/ខាត',
+        gain: 'ចំណេញ',
+        loss: 'ខាត',
         portfolioSummary: 'សង្ខេប',
         totalInvested: 'វិនិយោគ',
         currentValue: 'តម្លៃ',
@@ -572,6 +616,7 @@ function applyCustomPrice() {
     else if (priceMethod.value === 'damlung') goldPrice.value = (p / DAMLUNG) * TROY
     else if (priceMethod.value === 'chi') goldPrice.value = (p / CHI) * TROY
     lastUpdated.value = new Date().toLocaleTimeString() + ' (custom)'
+    animateCounterTo(goldPrice.value)
     save()
 }
 
@@ -590,7 +635,13 @@ async function sha256(str) {
 }
 
 async function unlockPurchases() {
-    if (!pwInput.value) { pwError.value = 'Enter a password'; return }
+    if (!pwInput.value) {
+        pwError.value = 'Enter a password'
+        pwShake.value = false
+        await nextTick(); pwShake.value = true
+        setTimeout(() => pwShake.value = false, 600)
+        return
+    }
     const hash = await sha256(pwInput.value)
 
     if (hash === OWNER_PW_HASH) {
@@ -606,6 +657,8 @@ async function unlockPurchases() {
         purchases.value = JSON.parse(localStorage.getItem(userKey) || '[]')
     }
 
+    pwUnlockBurst.value = true
+    setTimeout(() => pwUnlockBurst.value = false, 800)
     purchasesLocked.value = false
     pwInput.value = ''; pwError.value = ''
 }
@@ -620,7 +673,14 @@ function lockPurchases() {
 
 function scrollToPurchases() {
     const el = document.getElementById('purchases-section')
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        purchasesGlow.value = false
+        setTimeout(() => {
+            purchasesGlow.value = true
+            setTimeout(() => purchasesGlow.value = false, 1000)
+        }, 300)
+    }
 }
 
 // ─── Price Fetch ──────────────────────────────────────────────────────────────
@@ -651,6 +711,7 @@ async function fetchPrice() {
 
     if (ok) {
         lastUpdated.value = new Date().toLocaleTimeString()
+        animateCounterTo(goldPrice.value)
         save(); flash(t.value.pricesUpdated)
     } else {
         const cached = load()?.goldPrice
@@ -984,40 +1045,61 @@ onBeforeUnmount(() => {
     position: fixed;
     top: 0;
     left: 50%;
-    transform: translateX(-50%) translateY(-56px);
+    transform: translateX(-50%) translateY(-90px);
     z-index: 99;
     background: var(--surface);
     border: 1px solid var(--gold-border);
-    border-radius: 0 0 12px 12px;
-    padding: 6px 16px;
+    border-radius: 0 0 18px 18px;
+    padding: 10px 22px;
     display: flex;
     align-items: center;
-    gap: 6px;
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    gap: 12px;
+    transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
 }
 
 .sticky-price.visible { transform: translateX(-50%) translateY(0); }
 
-.sticky-gem { font-size: 12px; color: var(--gold); }
+.sticky-gem { font-size: 18px; color: var(--gold); flex-shrink: 0; }
+
+.sticky-prices { display: flex; flex-direction: column; gap: 1px; }
+
+.sticky-row-main { display: flex; align-items: baseline; gap: 4px; }
+.sticky-row-sub { display: flex; align-items: baseline; gap: 4px; }
 
 .sticky-val {
-    font-size: 16px;
+    font-size: 22px;
     font-weight: 800;
     color: var(--gold);
     font-family: var(--mono);
+    letter-spacing: -0.5px;
 }
 
-.sticky-unit { font-size: 11px; color: var(--text-3); }
+.sticky-unit { font-size: 12px; color: var(--text-3); }
+
+.sticky-val-sub {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gold-dim);
+    font-family: var(--mono);
+}
+
+.sticky-unit-sub { font-size: 11px; color: var(--text-3); }
+
+.sticky-divider {
+    width: 1px;
+    height: 32px;
+    background: var(--border);
+    flex-shrink: 0;
+}
 
 .sticky-refresh {
     background: none;
     border: none;
     color: var(--text-2);
     cursor: pointer;
-    font-size: 16px;
+    font-size: 20px;
     padding: 4px;
-    margin-left: 4px;
     transition: color 0.2s;
     min-height: unset;
 }
@@ -1952,4 +2034,72 @@ onBeforeUnmount(() => {
     .main { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
     .header { padding-top: env(safe-area-inset-top); }
 }
+
+/* ── Animation: Chip shimmer ── */
+@keyframes shimmerSwipe {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(300%); }
+}
+.chip-shimmer { position: relative; overflow: hidden; }
+.chip-shimmer .shimmer-line {
+    position: absolute;
+    top: 0; left: 0;
+    width: 40%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(245,200,66,0.3), transparent);
+    transform: translateX(-100%);
+    animation: shimmerSwipe 0.7s ease forwards;
+}
+
+/* ── Animation: Card stagger entrance ── */
+@keyframes cardSlideIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.p-card-stagger {
+    opacity: 0;
+    animation: cardSlideIn 0.35s ease forwards;
+}
+
+/* ── Animation: Lock shake ── */
+@keyframes lockShake {
+    0%,100% { transform: translateX(0); }
+    15%     { transform: translateX(-7px); }
+    30%     { transform: translateX(7px); }
+    45%     { transform: translateX(-5px); }
+    60%     { transform: translateX(5px); }
+    75%     { transform: translateX(-3px); }
+    90%     { transform: translateX(3px); }
+}
+.pw-icon.shake { animation: lockShake 0.5s ease; }
+
+/* ── Animation: Unlock burst rings ── */
+@keyframes burstRing {
+    0%   { transform: scale(0.5); opacity: 0.9; }
+    100% { transform: scale(2.4); opacity: 0; }
+}
+@keyframes burstRing2 {
+    0%   { transform: scale(0.5); opacity: 0.6; }
+    100% { transform: scale(1.9); opacity: 0; }
+}
+.burst-ring-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.burst-r1, .burst-r2 {
+    position: absolute;
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    border: 2px solid var(--gold);
+    opacity: 0;
+    pointer-events: none;
+}
+.burst-r2 { width: 40px; height: 40px; border-color: rgba(245,200,66,0.5); }
+.burst-ring-wrap.burst .burst-r1 { animation: burstRing 0.65s ease-out forwards; }
+.burst-ring-wrap.burst .burst-r2 { animation: burstRing2 0.55s ease-out 0.1s forwards; }
+
+/* ── Animation: Section glow pulse ── */
+@keyframes sectionGlow {
+    0%   { box-shadow: 0 0 0 0 rgba(245,200,66,0); }
+    30%  { box-shadow: 0 0 0 8px rgba(245,200,66,0.2); }
+    100% { box-shadow: 0 0 0 0 rgba(245,200,66,0); }
+}
+.section-glow { animation: sectionGlow 0.9s ease-out forwards; }
+
 </style>
