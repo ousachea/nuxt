@@ -17,6 +17,9 @@
                     </div>
                 </div>
                 <div class="header-controls">
+                    <button class="ctrl-btn" @click="scrollToPurchases" :aria-label="t.myPurchases" :title="t.myPurchases">
+                        <span>💰</span>
+                    </button>
                     <button class="ctrl-btn" @click="toggleDark" :aria-label="isDark ? 'Light mode' : 'Dark mode'">
                         <span>{{ isDark ? '☀' : '◑' }}</span>
                     </button>
@@ -31,7 +34,7 @@
             </div>
         </header>
 
-        <!-- Sticky Price Pill (visible when scrolled) -->
+        <!-- Sticky Price Pill -->
         <div class="sticky-price" :class="{ visible: showStickyPrice && goldPrice }">
             <span class="sticky-gem">◈</span>
             <span class="sticky-val">${{ goldPrice?.toFixed(2) ?? '——' }}</span>
@@ -65,8 +68,7 @@
                     <transition name="price-flip" mode="out-in">
                         <div class="hero-price" :key="goldPrice?.toFixed(0) ?? 'null'">
                             <span class="price-dollar">$</span>
-                            <span class="price-int">{{ goldPrice ? Math.floor(goldPrice).toLocaleString() : '——'
-                                }}</span>
+                            <span class="price-int">{{ goldPrice ? Math.floor(goldPrice).toLocaleString() : '——' }}</span>
                             <span v-if="goldPrice" class="price-dec">.{{ (goldPrice % 1).toFixed(2).slice(2) }}</span>
                         </div>
                     </transition>
@@ -179,156 +181,190 @@
             </section>
 
             <!-- ── PURCHASES ── -->
-            <section class="card">
+            <section class="card" id="purchases-section">
                 <div class="section-header">
                     <h2 class="section-title">{{ t.myPurchases }}</h2>
                     <div class="section-actions">
-                        <button class="ghost-btn" @click="exportCSV">↓ CSV</button>
-                        <button class="ghost-btn" @click="csvInput.click()">↑ CSV</button>
+                        <template v-if="!purchasesLocked">
+                            <button class="ghost-btn" @click="exportCSV">↓ CSV</button>
+                            <button class="ghost-btn" @click="csvInput.click()">↑ CSV</button>
+                            <button class="ghost-btn lock-btn" @click="lockPurchases" :title="t.lock">🔒</button>
+                        </template>
                         <input ref="csvInput" type="file" accept=".csv" hidden @change="importCSV" />
                     </div>
                 </div>
 
-                <!-- FAB-style Add Button -->
-                <button class="add-purchase-btn" @click="showForm = !showForm">
-                    <span class="add-icon">{{ showForm ? '✕' : '+' }}</span>
-                    <span>{{ showForm ? t.cancel : t.addPurchase }}</span>
-                </button>
-
-                <!-- Add Form -->
-                <transition name="slide-down">
-                    <div v-if="showForm" class="purchase-form">
-                        <div class="form-grid">
-                            <div class="form-field">
-                                <label>{{ t.weight }}</label>
-                                <input v-model.number="draft.weight" type="text" inputmode="decimal"
-                                    :placeholder="t.enterWeight" class="text-input" />
-                            </div>
-                            <div class="form-field">
-                                <label>{{ t.unit }}</label>
-                                <select v-model="draft.unit" class="text-input">
-                                    <option v-for="u in converterUnits" :key="u" :value="u">{{ t[u] || u }}</option>
-                                </select>
-                            </div>
-                            <div class="form-field">
-                                <label>{{ t.pricePaid }} (USD)</label>
-                                <input v-model.number="draft.price" type="text" inputmode="decimal"
-                                    :placeholder="t.enterPrice" class="text-input" />
-                            </div>
-                            <div class="form-field">
-                                <label>{{ t.date }}</label>
-                                <input v-model="draft.date" type="date" class="text-input" />
-                            </div>
-                        </div>
-                        <button class="primary-btn full-btn" @click="addPurchase">✦ {{ t.save }}</button>
+                <!-- ── PASSWORD GATE ── -->
+                <div v-if="purchasesLocked" class="pw-gate">
+                    <!-- Set new password -->
+                    <div v-if="!hasPwSet || isSettingPw" class="pw-box">
+                        <div class="pw-icon">🔐</div>
+                        <p class="pw-title">{{ isSettingPw ? t.changePw : t.setPw }}</p>
+                        <input v-model="pwInput" class="text-input" type="password"
+                            :placeholder="t.newPwPlaceholder" @keyup.enter="setupPassword" autocomplete="new-password" />
+                        <input v-model="pwConfirm" class="text-input" type="password"
+                            :placeholder="t.confirmPw" @keyup.enter="setupPassword" autocomplete="new-password" />
+                        <transition name="fade">
+                            <p v-if="pwError" class="pw-error">{{ pwError }}</p>
+                        </transition>
+                        <button class="primary-btn full-btn" @click="setupPassword">✦ {{ t.setPwBtn }}</button>
+                        <button v-if="isSettingPw" class="ghost-btn full-btn" @click="isSettingPw = false; pwError = ''">{{ t.cancel }}</button>
                     </div>
-                </transition>
 
-                <!-- Purchase Cards -->
-                <div v-if="purchases.length" class="purchases-list">
-                    <div v-for="(p, i) in purchases" :key="p.id" class="p-card" :style="{
-        borderLeftColor: gainLoss(p) >= 0 ? 'var(--gain)' : 'var(--loss)',
-        borderColor: gainLoss(p) >= 0 ? 'var(--gain-border)' : 'var(--loss-border)',
-        background: gainLoss(p) >= 0 ? 'var(--gain-bg)' : 'var(--loss-bg)'
-    }">
-                        <template v-if="editIdx !== i">
-                            <!-- Card Header -->
-                            <div class="pcard-header">
-                                <div class="pcard-weight-row">
-                                    <span class="pcard-weight">{{ p.weight }} <span class="pcard-unit">{{ t[p.unit] ||
-        p.unit }}</span></span>
-                                    <span class="pcard-date">{{ formatDate(p.date) }}</span>
-                                </div>
-                                <div class="pcard-btns">
-                                    <button class="pcard-btn" @click="startEdit(i)" :aria-label="t.edit">✎</button>
-                                    <button class="pcard-btn danger" @click="removePurchase(i)"
-                                        :aria-label="t.delete">✕</button>
-                                </div>
-                            </div>
-                            <!-- GL Bar -->
-                            <div class="gl-row">
-                                <div class="gl-col">
-                                    <span class="gl-label">{{ t.paid }}</span>
-                                    <span class="gl-val">${{ p.price.toFixed(2) }}</span>
-                                </div>
-                                <div class="gl-divider" />
-                                <div class="gl-col">
-                                    <span class="gl-label">{{ t.current }}</span>
-                                    <span class="gl-val" :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">${{
-        currentValue(p).toFixed(2) }}</span>
-                                </div>
-                                <div class="gl-divider" />
-                                <div class="gl-col">
-                                    <span class="gl-label">{{ t.gainLoss }}</span>
-                                    <span class="gl-val gl-main" :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">
-                                        {{ gainLoss(p) >= 0 ? '+' : '' }}${{ gainLoss(p).toFixed(2) }}
-                                    </span>
-                                </div>
-                            </div>
-                        </template>
+                    <!-- Unlock -->
+                    <div v-else class="pw-box">
+                        <div class="pw-icon">🔒</div>
+                        <p class="pw-title">{{ t.locked }}</p>
+                        <input v-model="pwInput" class="text-input" type="password"
+                            :placeholder="t.enterPw" @keyup.enter="unlockPurchases" autocomplete="current-password" />
+                        <transition name="fade">
+                            <p v-if="pwError" class="pw-error">{{ pwError }}</p>
+                        </transition>
+                        <button class="primary-btn full-btn" @click="unlockPurchases">{{ t.unlock }}</button>
+                        <button class="ghost-btn full-btn" style="margin-top:4px"
+                            @click="isSettingPw = true; pwError = ''; pwInput = ''">{{ t.changePw }}</button>
+                    </div>
+                </div>
 
-                        <!-- Edit Form -->
-                        <template v-else>
+                <!-- ── PURCHASES CONTENT (unlocked) ── -->
+                <template v-else>
+
+                    <!-- FAB-style Add Button -->
+                    <button class="add-purchase-btn" @click="showForm = !showForm">
+                        <span class="add-icon">{{ showForm ? '✕' : '+' }}</span>
+                        <span>{{ showForm ? t.cancel : t.addPurchase }}</span>
+                    </button>
+
+                    <!-- Add Form -->
+                    <transition name="slide-down">
+                        <div v-if="showForm" class="purchase-form">
                             <div class="form-grid">
                                 <div class="form-field">
                                     <label>{{ t.weight }}</label>
-                                    <input v-model.number="editDraft.weight" type="text" inputmode="decimal"
-                                        class="text-input" />
+                                    <input v-model.number="draft.weight" type="text" inputmode="decimal"
+                                        :placeholder="t.enterWeight" class="text-input" />
                                 </div>
                                 <div class="form-field">
                                     <label>{{ t.unit }}</label>
-                                    <select v-model="editDraft.unit" class="text-input">
+                                    <select v-model="draft.unit" class="text-input">
                                         <option v-for="u in converterUnits" :key="u" :value="u">{{ t[u] || u }}</option>
                                     </select>
                                 </div>
                                 <div class="form-field">
-                                    <label>{{ t.pricePaid }}</label>
-                                    <input v-model.number="editDraft.price" type="text" inputmode="decimal"
-                                        class="text-input" />
+                                    <label>{{ t.pricePaid }} (USD)</label>
+                                    <input v-model.number="draft.price" type="text" inputmode="decimal"
+                                        :placeholder="t.enterPrice" class="text-input" />
                                 </div>
                                 <div class="form-field">
                                     <label>{{ t.date }}</label>
-                                    <input v-model="editDraft.date" type="date" class="text-input" />
+                                    <input v-model="draft.date" type="date" class="text-input" />
                                 </div>
                             </div>
-                            <div class="edit-actions">
-                                <button class="primary-btn" style="flex:1" @click="saveEdit">{{ t.save }}</button>
-                                <button class="ghost-btn" style="flex:1" @click="editIdx = null">{{ t.cancel }}</button>
+                            <button class="primary-btn full-btn" @click="addPurchase">✦ {{ t.save }}</button>
+                        </div>
+                    </transition>
+
+                    <!-- Purchase Cards -->
+                    <div v-if="purchases.length" class="purchases-list">
+                        <div v-for="(p, i) in purchases" :key="p.id" class="p-card" :style="{
+                            borderLeftColor: gainLoss(p) >= 0 ? 'var(--gain)' : 'var(--loss)',
+                            borderColor: gainLoss(p) >= 0 ? 'var(--gain-border)' : 'var(--loss-border)',
+                            background: gainLoss(p) >= 0 ? 'var(--gain-bg)' : 'var(--loss-bg)'
+                        }">
+                            <template v-if="editIdx !== i">
+                                <!-- Card Header -->
+                                <div class="pcard-header">
+                                    <div class="pcard-weight-row">
+                                        <span class="pcard-weight">{{ p.weight }} <span class="pcard-unit">{{ t[p.unit] || p.unit }}</span></span>
+                                        <span class="pcard-date">{{ formatDate(p.date) }}</span>
+                                    </div>
+                                    <div class="pcard-btns">
+                                        <button class="pcard-btn" @click="startEdit(i)" :aria-label="t.edit">✎</button>
+                                        <button class="pcard-btn danger" @click="removePurchase(i)" :aria-label="t.delete">✕</button>
+                                    </div>
+                                </div>
+                                <!-- GL Bar -->
+                                <div class="gl-row">
+                                    <div class="gl-col">
+                                        <span class="gl-label">{{ t.paid }}</span>
+                                        <span class="gl-val">${{ p.price.toFixed(2) }}</span>
+                                    </div>
+                                    <div class="gl-divider" />
+                                    <div class="gl-col">
+                                        <span class="gl-label">{{ t.current }}</span>
+                                        <span class="gl-val" :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">${{ currentValue(p).toFixed(2) }}</span>
+                                    </div>
+                                    <div class="gl-divider" />
+                                    <div class="gl-col">
+                                        <span class="gl-label">{{ t.gainLoss }}</span>
+                                        <span class="gl-val gl-main" :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">
+                                            {{ gainLoss(p) >= 0 ? '+' : '' }}${{ gainLoss(p).toFixed(2) }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <!-- Edit Form -->
+                            <template v-else>
+                                <div class="form-grid">
+                                    <div class="form-field">
+                                        <label>{{ t.weight }}</label>
+                                        <input v-model.number="editDraft.weight" type="text" inputmode="decimal" class="text-input" />
+                                    </div>
+                                    <div class="form-field">
+                                        <label>{{ t.unit }}</label>
+                                        <select v-model="editDraft.unit" class="text-input">
+                                            <option v-for="u in converterUnits" :key="u" :value="u">{{ t[u] || u }}</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-field">
+                                        <label>{{ t.pricePaid }}</label>
+                                        <input v-model.number="editDraft.price" type="text" inputmode="decimal" class="text-input" />
+                                    </div>
+                                    <div class="form-field">
+                                        <label>{{ t.date }}</label>
+                                        <input v-model="editDraft.date" type="date" class="text-input" />
+                                    </div>
+                                </div>
+                                <div class="edit-actions">
+                                    <button class="primary-btn" style="flex:1" @click="saveEdit">{{ t.save }}</button>
+                                    <button class="ghost-btn" style="flex:1" @click="editIdx = null">{{ t.cancel }}</button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Portfolio Summary -->
+                    <div v-if="purchases.length" class="summary">
+                        <div class="sum-row">
+                            <div class="sum-item">
+                                <span class="sum-label">{{ t.totalInvested }}</span>
+                                <span class="sum-val">${{ totalInvested.toFixed(2) }}</span>
                             </div>
-                        </template>
+                            <div class="sum-item" :class="totalGL >= 0 ? 'gain' : 'loss'">
+                                <span class="sum-label">{{ t.currentValue }}</span>
+                                <span class="sum-val">${{ totalCurrent.toFixed(2) }}</span>
+                            </div>
+                            <div class="sum-item" :class="totalGL >= 0 ? 'gain' : 'loss'">
+                                <span class="sum-label">{{ t.totalGainLoss }}</span>
+                                <span class="sum-val">{{ totalGL >= 0 ? '+' : '' }}${{ totalGL.toFixed(2) }}</span>
+                            </div>
+                        </div>
+                        <div v-if="totalInvested > 0" class="portfolio-bar">
+                            <div class="portfolio-fill" :class="totalGL >= 0 ? 'gain' : 'loss'"
+                                :style="{ width: Math.min(Math.abs(totalGL / totalInvested) * 100, 100) + '%' }" />
+                        </div>
+                        <div v-if="totalInvested > 0" class="portfolio-pct" :class="totalGL >= 0 ? 'gain' : 'loss'">
+                            {{ totalGL >= 0 ? '▲' : '▼' }} {{ Math.abs(totalGL / totalInvested * 100).toFixed(1) }}%
+                        </div>
                     </div>
-                </div>
 
-                <!-- Portfolio Summary -->
-                <div v-if="purchases.length" class="summary">
-                    <div class="sum-row">
-                        <div class="sum-item">
-                            <span class="sum-label">{{ t.totalInvested }}</span>
-                            <span class="sum-val">${{ totalInvested.toFixed(2) }}</span>
-                        </div>
-                        <div class="sum-item" :class="totalGL >= 0 ? 'gain' : 'loss'">
-                            <span class="sum-label">{{ t.currentValue }}</span>
-                            <span class="sum-val">${{ totalCurrent.toFixed(2) }}</span>
-                        </div>
-                        <div class="sum-item" :class="totalGL >= 0 ? 'gain' : 'loss'">
-                            <span class="sum-label">{{ t.totalGainLoss }}</span>
-                            <span class="sum-val">{{ totalGL >= 0 ? '+' : '' }}${{ totalGL.toFixed(2) }}</span>
-                        </div>
+                    <div v-else-if="!showForm" class="empty-state">
+                        <span class="empty-icon">◈</span>
+                        <p>{{ t.noPurchases }}</p>
                     </div>
-                    <!-- Mini progress bar showing gain/loss ratio -->
-                    <div v-if="totalInvested > 0" class="portfolio-bar">
-                        <div class="portfolio-fill" :class="totalGL >= 0 ? 'gain' : 'loss'"
-                            :style="{ width: Math.min(Math.abs(totalGL / totalInvested) * 100, 100) + '%' }" />
-                    </div>
-                    <div v-if="totalInvested > 0" class="portfolio-pct" :class="totalGL >= 0 ? 'gain' : 'loss'">
-                        {{ totalGL >= 0 ? '▲' : '▼' }} {{ Math.abs(totalGL / totalInvested * 100).toFixed(1) }}%
-                    </div>
-                </div>
 
-                <div v-else-if="!showForm" class="empty-state">
-                    <span class="empty-icon">◈</span>
-                    <p>{{ t.noPurchases }}</p>
-                </div>
+                </template>
             </section>
 
         </main>
@@ -350,6 +386,19 @@ const HUN = 0.375
 const LI = 0.0375
 
 const converterUnits = ['li', 'hun', 'chi', 'gram', 'damlung', 'troyOz']
+
+// ─── Pre-loaded purchases (owner only) ───────────────────────────────────────
+const OWNER_PW_HASH = '5b91bc1234678bc03abe05d9966d30d1911a16d510605ea015b37cd3be316e05' // sha256("ousa123")
+const PRE_PURCHASES = [
+    { id: 'pre_1', weight: 1,  unit: 'chi', price: 610,  date: '2024-01-01' },
+    { id: 'pre_2', weight: 1,  unit: 'chi', price: 518,  date: '2024-01-01' },
+    { id: 'pre_3', weight: 1,  unit: 'chi', price: 590,  date: '2024-01-01' },
+    { id: 'pre_4', weight: 1,  unit: 'chi', price: 505,  date: '2024-01-01' },
+    { id: 'pre_5', weight: 3,  unit: 'chi', price: 1440, date: '2024-01-01' },
+    { id: 'pre_6', weight: 2,  unit: 'chi', price: 1030, date: '2024-01-01' },
+    { id: 'pre_7', weight: 5,  unit: 'chi', price: 2000, date: '2024-01-01' },
+    { id: 'pre_8', weight: 10, unit: 'chi', price: 4900, date: '2024-01-01' },
+]
 
 // ─── State ────────────────────────────────────────────────────────────────────
 const lang = ref('en')
@@ -373,6 +422,13 @@ const draft = ref({ weight: '', unit: 'chi', price: '', date: today() })
 const editIdx = ref(null)
 const editDraft = ref({})
 const csvInput = ref(null)
+
+// ─── Password State ───────────────────────────────────────────────────────────
+const purchasesLocked = ref(true)
+const pwInput = ref('')
+const pwConfirm = ref('')
+const pwError = ref('')
+const isSettingPw = ref(false)
 
 // ─── i18n ────────────────────────────────────────────────────────────────────
 const translations = {
@@ -420,6 +476,15 @@ const translations = {
         fetchPriceFirst: 'Fetch a price first',
         offlineWarning: 'You are offline — prices may be outdated',
         noPurchases: 'No purchases yet. Tap + Add above.',
+        lock: 'Lock purchases',
+        locked: 'Purchases locked',
+        unlock: 'Unlock',
+        setPw: 'Set a password to protect your purchases',
+        setPwBtn: 'Set Password',
+        changePw: 'Change password',
+        newPwPlaceholder: 'New password (min 4 chars)',
+        confirmPw: 'Confirm password',
+        enterPw: 'Enter password',
     },
     km: {
         title: 'តាមដានមាស',
@@ -465,9 +530,21 @@ const translations = {
         fetchPriceFirst: 'សូមទាញតម្លៃជាមុន',
         offlineWarning: '⚠ ក្រៅបណ្តាញ',
         noPurchases: 'មិនទាន់មានការទិញ។ ចុច + បន្ថែម',
+        lock: 'ចាក់សោ',
+        locked: 'ការទិញត្រូវបានចាក់សោ',
+        unlock: 'ដោះសោ',
+        setPw: 'កំណត់ពាក្យសម្ងាត់ដើម្បីការពារការទិញ',
+        setPwBtn: 'កំណត់ពាក្យសម្ងាត់',
+        changePw: 'ផ្លាស់ប្តូរពាក្យសម្ងាត់',
+        newPwPlaceholder: 'ពាក្យសម្ងាត់ថ្មី (យ៉ាងហោចណាស់ ៤)',
+        confirmPw: 'បញ្ជាក់ពាក្យសម្ងាត់',
+        enterPw: 'បញ្ចូលពាក្យសម្ងាត់',
     }
 }
 const t = computed(() => translations[lang.value])
+
+// ─── Password Computed ────────────────────────────────────────────────────────
+const hasPwSet = computed(() => !!localStorage.getItem('gt4_pwhash'))
 
 // ─── Price computations ───────────────────────────────────────────────────────
 const pricePerGram = computed(() => goldPrice.value ? goldPrice.value / TROY : 0)
@@ -492,7 +569,7 @@ const totalInvested = computed(() => purchases.value.reduce((s, p) => s + p.pric
 const totalCurrent = computed(() => purchases.value.reduce((s, p) => s + currentValue(p), 0))
 const totalGL = computed(() => totalCurrent.value - totalInvested.value)
 
-// ─── Methods ─────────────────────────────────────────────────────────────────
+// ─── Methods ──────────────────────────────────────────────────────────────────
 function today() { return new Date().toISOString().split('T')[0] }
 function toggleLang() { lang.value = lang.value === 'en' ? 'km' : 'en'; save() }
 function toggleDark() { isDark.value = !isDark.value; save() }
@@ -506,7 +583,6 @@ function fromGrams(g, u) {
 function convertUnit(val, from, to) { return fromGrams(toGrams(val, from), to).toFixed(4) }
 function currentValue(p) { return goldPrice.value ? pricePerGram.value * toGrams(p.weight, p.unit) : 0 }
 function gainLoss(p) { return currentValue(p) - p.price }
-function gainClass(p) { return gainLoss(p) >= 0 ? 'gain' : 'loss' }
 function formatDate(d) { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) }
 
 function flash(msg, type = 'success') {
@@ -536,6 +612,56 @@ async function pasteClipboard() {
     } catch { flash('Allow clipboard access or paste manually', 'error') }
 }
 
+// ─── Password Methods ─────────────────────────────────────────────────────────
+async function sha256(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str))
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function setupPassword() {
+    if (!pwInput.value || pwInput.value.length < 4) {
+        pwError.value = 'Min 4 characters'; return
+    }
+    if (pwInput.value !== pwConfirm.value) {
+        pwError.value = 'Passwords do not match'; return
+    }
+    const hash = await sha256(pwInput.value)
+    localStorage.setItem('gt4_pwhash', hash)
+    purchasesLocked.value = false
+    isSettingPw.value = false
+    pwInput.value = ''; pwConfirm.value = ''; pwError.value = ''
+    flash('✓ Password set')
+}
+
+async function unlockPurchases() {
+    if (!pwInput.value) { pwError.value = 'Enter your password'; return }
+    const hash = await sha256(pwInput.value)
+    if (hash === localStorage.getItem('gt4_pwhash')) {
+        // If owner password — merge pre-purchases (avoid duplicates)
+        if (hash === OWNER_PW_HASH) {
+            const existingIds = new Set(purchases.value.map(p => p.id))
+            const toAdd = PRE_PURCHASES.filter(p => !existingIds.has(p.id))
+            if (toAdd.length) { purchases.value = [...toAdd, ...purchases.value]; save() }
+        }
+        purchasesLocked.value = false
+        pwInput.value = ''; pwError.value = ''
+    } else {
+        pwError.value = 'Wrong password'
+        pwInput.value = ''
+    }
+}
+
+function scrollToPurchases() {
+    const el = document.getElementById('purchases-section')
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function lockPurchases() {
+    purchasesLocked.value = true
+    pwInput.value = ''; pwError.value = ''; isSettingPw.value = false
+}
+
+// ─── Price Fetch ──────────────────────────────────────────────────────────────
 async function fetchPrice() {
     loading.value = true
     let ok = false
@@ -577,6 +703,7 @@ async function fetchPrice() {
     loading.value = false
 }
 
+// ─── Purchases ────────────────────────────────────────────────────────────────
 function addPurchase() {
     if (!draft.value.weight || !draft.value.price) { flash('Fill in weight and price', 'error'); return }
     purchases.value.push({ ...draft.value, id: Date.now() })
@@ -632,6 +759,7 @@ function importCSV(e) {
     reader.readAsText(file); e.target.value = ''
 }
 
+// ─── Persistence ──────────────────────────────────────────────────────────────
 function save() {
     try {
         localStorage.setItem('gt4', JSON.stringify({
@@ -646,11 +774,7 @@ function load() { try { return JSON.parse(localStorage.getItem('gt4') || 'null')
 
 function handleOnline() { isOnline.value = true; fetchPrice() }
 function handleOffline() { isOnline.value = false }
-
-function handleScroll() {
-    // Show sticky price after scrolling past ~100px
-    showStickyPrice.value = window.scrollY > 100
-}
+function handleScroll() { showStickyPrice.value = window.scrollY > 100 }
 
 onMounted(() => {
     const d = load()
@@ -661,6 +785,8 @@ onMounted(() => {
         customPrice.value = d.customPrice || null; customApiUrl.value = d.customApiUrl || ''
         priceSource.value = d.priceSource || 'api'
     }
+    // Lock if a password has been set
+    purchasesLocked.value = !!localStorage.getItem('gt4_pwhash')
     if (priceSource.value === 'api') fetchPrice()
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
@@ -684,7 +810,6 @@ onBeforeUnmount(() => {
     padding: 0;
 }
 
-/* ── Design Tokens ── */
 .app {
     --gold: #F5C842;
     --gold-dim: #C08A10;
@@ -704,7 +829,6 @@ onBeforeUnmount(() => {
     --touch: 52px;
 }
 
-/* ── Dark theme (default) ── */
 .app.dark {
     --bg: #0C0C12;
     --surface: #13131C;
@@ -717,7 +841,6 @@ onBeforeUnmount(() => {
     --text-3: #5A576A;
 }
 
-/* ── Light theme ── */
 .app:not(.dark) {
     --bg: #F4F1EB;
     --surface: #FFFFFF;
@@ -733,7 +856,6 @@ onBeforeUnmount(() => {
     --gold-border: rgba(160, 110, 0, 0.25);
 }
 
-/* ── Base ── */
 .app {
     min-height: 100vh;
     background: var(--bg);
@@ -745,7 +867,6 @@ onBeforeUnmount(() => {
     overflow-x: hidden;
 }
 
-/* ── Ambient ── */
 .ambient {
     position: fixed;
     inset: 0;
@@ -779,21 +900,13 @@ onBeforeUnmount(() => {
     animation: drift 18s ease-in-out infinite alternate-reverse;
 }
 
-.app:not(.dark) .orb {
-    opacity: 0.08;
-}
+.app:not(.dark) .orb { opacity: 0.08; }
 
 @keyframes drift {
-    from {
-        transform: translate(0, 0) scale(1);
-    }
-
-    to {
-        transform: translate(20px, 30px) scale(1.08);
-    }
+    from { transform: translate(0, 0) scale(1); }
+    to { transform: translate(20px, 30px) scale(1.08); }
 }
 
-/* ── Header ── */
 .header {
     position: sticky;
     top: 0;
@@ -804,9 +917,7 @@ onBeforeUnmount(() => {
     border-bottom: 1px solid var(--border);
 }
 
-.app:not(.dark) .header {
-    background: rgba(244, 241, 235, 0.92);
-}
+.app:not(.dark) .header { background: rgba(244, 241, 235, 0.92); }
 
 .header-inner {
     max-width: 640px;
@@ -896,7 +1007,6 @@ onBeforeUnmount(() => {
     border-top: 1px solid var(--gold-border);
 }
 
-/* ── Sticky Price ── */
 .sticky-price {
     position: fixed;
     top: 0;
@@ -914,14 +1024,9 @@ onBeforeUnmount(() => {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
-.sticky-price.visible {
-    transform: translateX(-50%) translateY(0);
-}
+.sticky-price.visible { transform: translateX(-50%) translateY(0); }
 
-.sticky-gem {
-    font-size: 12px;
-    color: var(--gold);
-}
+.sticky-gem { font-size: 12px; color: var(--gold); }
 
 .sticky-val {
     font-size: 16px;
@@ -930,10 +1035,7 @@ onBeforeUnmount(() => {
     font-family: var(--mono);
 }
 
-.sticky-unit {
-    font-size: 11px;
-    color: var(--text-3);
-}
+.sticky-unit { font-size: 11px; color: var(--text-3); }
 
 .sticky-refresh {
     background: none;
@@ -947,11 +1049,8 @@ onBeforeUnmount(() => {
     min-height: unset;
 }
 
-.sticky-refresh:hover {
-    color: var(--gold);
-}
+.sticky-refresh:hover { color: var(--gold); }
 
-/* ── Main ── */
 .main {
     position: relative;
     z-index: 1;
@@ -963,7 +1062,6 @@ onBeforeUnmount(() => {
     gap: 10px;
 }
 
-/* ── Cards ── */
 .card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -982,7 +1080,6 @@ onBeforeUnmount(() => {
     background: linear-gradient(90deg, transparent, var(--gold), transparent);
 }
 
-/* ── Segmented Control ── */
 .seg-ctrl {
     display: flex;
     background: var(--surface2);
@@ -1013,10 +1110,7 @@ onBeforeUnmount(() => {
     border: 1px solid var(--gold-border);
 }
 
-/* ── Hero Price ── */
-.hero-price-block {
-    margin-bottom: 14px;
-}
+.hero-price-block { margin-bottom: 14px; }
 
 .hero-meta-row {
     display: flex;
@@ -1076,7 +1170,6 @@ onBeforeUnmount(() => {
     font-family: var(--mono);
 }
 
-/* ── Chips ── */
 .chips-scroll {
     display: flex;
     gap: 6px;
@@ -1088,9 +1181,7 @@ onBeforeUnmount(() => {
     padding-left: 4px;
 }
 
-.chips-scroll::-webkit-scrollbar {
-    display: none;
-}
+.chips-scroll::-webkit-scrollbar { display: none; }
 
 .chip {
     display: flex;
@@ -1119,7 +1210,6 @@ onBeforeUnmount(() => {
     font-family: var(--mono);
 }
 
-/* ── Progress Bar ── */
 .progress-bar {
     height: 3px;
     background: var(--surface3);
@@ -1135,20 +1225,11 @@ onBeforeUnmount(() => {
 }
 
 @keyframes progress {
-    0% {
-        transform: translateX(-100%) scaleX(0.4);
-    }
-
-    50% {
-        transform: translateX(60%) scaleX(0.8);
-    }
-
-    100% {
-        transform: translateX(200%) scaleX(0.4);
-    }
+    0% { transform: translateX(-100%) scaleX(0.4); }
+    50% { transform: translateX(60%) scaleX(0.8); }
+    100% { transform: translateX(200%) scaleX(0.4); }
 }
 
-/* ── Flash ── */
 .flash {
     padding: 10px 14px;
     border-radius: 10px;
@@ -1169,7 +1250,6 @@ onBeforeUnmount(() => {
     color: var(--loss);
 }
 
-/* ── Sub Panels ── */
 .sub-panel {
     margin-top: 14px;
     padding-top: 14px;
@@ -1206,10 +1286,7 @@ onBeforeUnmount(() => {
     border-radius: 6px;
 }
 
-.api-hint-text {
-    font-size: 12px;
-    color: var(--text-3);
-}
+.api-hint-text { font-size: 12px; color: var(--text-3); }
 
 .api-key-row {
     display: flex;
@@ -1223,16 +1300,9 @@ onBeforeUnmount(() => {
     line-height: 1.5;
 }
 
-.api-hint a {
-    color: var(--gold);
-    text-decoration: none;
-}
+.api-hint a { color: var(--gold); text-decoration: none; }
+.api-hint a:hover { text-decoration: underline; }
 
-.api-hint a:hover {
-    text-decoration: underline;
-}
-
-/* ── Method Tabs ── */
 .method-tabs {
     display: flex;
     gap: 6px;
@@ -1259,9 +1329,7 @@ onBeforeUnmount(() => {
     color: var(--gold);
 }
 
-.price-input-row {
-    display: flex;
-}
+.price-input-row { display: flex; }
 
 .input-prefix {
     background: var(--surface3);
@@ -1277,11 +1345,8 @@ onBeforeUnmount(() => {
     flex-shrink: 0;
 }
 
-.price-input {
-    border-radius: 0 10px 10px 0 !important;
-}
+.price-input { border-radius: 0 10px 10px 0 !important; }
 
-/* ── Shared Inputs ── */
 .text-input {
     background: var(--surface2);
     border: 1px solid var(--border);
@@ -1302,11 +1367,8 @@ onBeforeUnmount(() => {
     border-color: var(--gold-border);
 }
 
-.text-input::placeholder {
-    color: var(--text-3);
-}
+.text-input::placeholder { color: var(--text-3); }
 
-/* ── Buttons ── */
 .primary-btn {
     display: inline-flex;
     align-items: center;
@@ -1330,24 +1392,15 @@ onBeforeUnmount(() => {
     transform: translateY(-1px);
 }
 
-.primary-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
+.primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .app:not(.dark) .primary-btn {
     color: #fff;
     background: var(--gold-dim);
 }
 
-.refresh-btn {
-    flex-shrink: 0;
-    padding: 14px 20px;
-}
-
-.full-btn {
-    width: 100%;
-}
+.refresh-btn { flex-shrink: 0; padding: 14px 20px; }
+.full-btn { width: 100%; }
 
 .ghost-btn {
     display: inline-flex;
@@ -1387,26 +1440,16 @@ onBeforeUnmount(() => {
     flex-shrink: 0;
 }
 
-.icon-btn-sm:hover {
-    border-color: var(--gold-border);
-}
-
-.icon-btn-sm.danger:hover {
-    border-color: var(--loss-border);
-}
+.icon-btn-sm:hover { border-color: var(--gold-border); }
+.icon-btn-sm.danger:hover { border-color: var(--loss-border); }
 
 .spin {
     display: inline-block;
     animation: spin 1s linear infinite;
 }
 
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Section ── */
 .section-title {
     font-size: 14px;
     font-weight: 700;
@@ -1430,16 +1473,19 @@ onBeforeUnmount(() => {
     flex-wrap: wrap;
 }
 
-.section-header .section-title {
-    margin-bottom: 0;
-}
+.section-header .section-title { margin-bottom: 0; }
 
 .section-actions {
     display: flex;
     gap: 6px;
+    align-items: center;
 }
 
-/* ── Converter ── */
+.lock-btn {
+    padding: 10px 12px;
+    font-size: 16px;
+}
+
 .conv-tabs-scroll {
     display: flex;
     gap: 5px;
@@ -1450,9 +1496,7 @@ onBeforeUnmount(() => {
     margin-bottom: 12px;
 }
 
-.conv-tabs-scroll::-webkit-scrollbar {
-    display: none;
-}
+.conv-tabs-scroll::-webkit-scrollbar { display: none; }
 
 .conv-tab {
     padding: 10px 14px;
@@ -1518,15 +1562,8 @@ onBeforeUnmount(() => {
     gap: 8px;
 }
 
-.conv-row:last-child {
-    border-bottom: none;
-}
-
-.conv-label {
-    font-size: 14px;
-    color: var(--text-2);
-    font-weight: 500;
-}
+.conv-row:last-child { border-bottom: none; }
+.conv-label { font-size: 14px; color: var(--text-2); font-weight: 500; }
 
 .conv-val {
     font-size: 14px;
@@ -1535,7 +1572,6 @@ onBeforeUnmount(() => {
     color: var(--text);
 }
 
-/* ── Unit Grid ── */
 .unit-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -1553,9 +1589,7 @@ onBeforeUnmount(() => {
     transition: border-color 0.2s;
 }
 
-.unit-tile:hover {
-    border-color: var(--gold-border);
-}
+.unit-tile:hover { border-color: var(--gold-border); }
 
 .tile-top {
     display: flex;
@@ -1571,11 +1605,7 @@ onBeforeUnmount(() => {
     letter-spacing: 0.06em;
 }
 
-.tile-gram {
-    font-size: 10px;
-    color: var(--text-3);
-    font-family: var(--mono);
-}
+.tile-gram { font-size: 10px; color: var(--text-3); font-family: var(--mono); }
 
 .tile-price {
     font-size: 14px;
@@ -1588,7 +1618,44 @@ onBeforeUnmount(() => {
     white-space: nowrap;
 }
 
-/* ── Add Button ── */
+/* ── Password Gate ── */
+.pw-gate {
+    display: flex;
+    justify-content: center;
+    padding: 16px 0 8px;
+}
+
+.pw-box {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    max-width: 340px;
+    align-items: stretch;
+}
+
+.pw-icon {
+    font-size: 32px;
+    text-align: center;
+    margin-bottom: 4px;
+}
+
+.pw-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    text-align: center;
+    margin-bottom: 4px;
+    line-height: 1.4;
+}
+
+.pw-error {
+    font-size: 13px;
+    color: var(--loss);
+    text-align: center;
+    font-weight: 500;
+}
+
 .add-purchase-btn {
     display: flex;
     align-items: center;
@@ -1614,12 +1681,8 @@ onBeforeUnmount(() => {
     background: var(--gold-alpha);
 }
 
-.add-icon {
-    font-size: 22px;
-    line-height: 1;
-}
+.add-icon { font-size: 22px; line-height: 1; }
 
-/* ── Purchase Form ── */
 .purchase-form {
     background: var(--surface2);
     border: 1px solid var(--border);
@@ -1649,7 +1712,6 @@ onBeforeUnmount(() => {
     letter-spacing: 0.07em;
 }
 
-/* ── Purchase Cards ── */
 .purchases-list {
     display: flex;
     flex-direction: column;
@@ -1664,18 +1726,6 @@ onBeforeUnmount(() => {
     padding: 14px;
     transition: all 0.2s;
     border-left: 3px solid var(--border);
-}
-
-.p-card.gain {
-    border-color: var(--gain-border);
-    background: var(--gain-bg);
-    border-left-color: var(--gain);
-}
-
-.p-card.loss {
-    border-color: var(--loss-border);
-    background: var(--loss-bg);
-    border-left-color: var(--loss);
 }
 
 .pcard-header {
@@ -1700,23 +1750,10 @@ onBeforeUnmount(() => {
     font-variant-numeric: tabular-nums;
 }
 
-.pcard-unit {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-2);
-}
+.pcard-unit { font-size: 13px; font-weight: 600; color: var(--text-2); }
+.pcard-date { font-size: 11px; color: var(--text-3); font-family: var(--mono); }
 
-.pcard-date {
-    font-size: 11px;
-    color: var(--text-3);
-    font-family: var(--mono);
-}
-
-.pcard-btns {
-    display: flex;
-    gap: 6px;
-    flex-shrink: 0;
-}
+.pcard-btns { display: flex; gap: 6px; flex-shrink: 0; }
 
 .pcard-btn {
     background: var(--surface3);
@@ -1733,21 +1770,10 @@ onBeforeUnmount(() => {
     justify-content: center;
 }
 
-.pcard-btn:hover {
-    border-color: var(--gold-border);
-    color: var(--gold);
-}
+.pcard-btn:hover { border-color: var(--gold-border); color: var(--gold); }
+.pcard-btn.danger:hover { border-color: var(--loss-border); color: var(--loss); }
 
-.pcard-btn.danger:hover {
-    border-color: var(--loss-border);
-    color: var(--loss);
-}
-
-/* GL Row — 3-column layout */
-.gl-row {
-    display: flex;
-    align-items: stretch;
-}
+.gl-row { display: flex; align-items: stretch; }
 
 .gl-col {
     flex: 1;
@@ -1757,13 +1783,8 @@ onBeforeUnmount(() => {
     padding: 0 4px;
 }
 
-.gl-col:first-child {
-    padding-left: 0;
-}
-
-.gl-col:last-child {
-    padding-right: 0;
-}
+.gl-col:first-child { padding-left: 0; }
+.gl-col:last-child { padding-right: 0; }
 
 .gl-divider {
     width: 1px;
@@ -1780,31 +1801,13 @@ onBeforeUnmount(() => {
     letter-spacing: 0.05em;
 }
 
-.gl-val {
-    font-size: 13px;
-    font-weight: 700;
-    font-family: var(--mono);
-    color: var(--text);
-}
+.gl-val { font-size: 13px; font-weight: 700; font-family: var(--mono); color: var(--text); }
+.gl-main { font-size: 14px; }
+.gain-text { color: var(--gain) !important; }
+.loss-text { color: var(--loss) !important; }
 
-.gl-main {
-    font-size: 14px;
-}
+.edit-actions { display: flex; gap: 8px; }
 
-.gain-text {
-    color: var(--gain) !important;
-}
-
-.loss-text {
-    color: var(--loss) !important;
-}
-
-.edit-actions {
-    display: flex;
-    gap: 8px;
-}
-
-/* ── Summary ── */
 .summary {
     background: var(--surface2);
     border: 1px solid var(--border);
@@ -1863,13 +1866,8 @@ onBeforeUnmount(() => {
     white-space: nowrap;
 }
 
-.sum-item.gain .sum-val {
-    color: var(--gain);
-}
-
-.sum-item.loss .sum-val {
-    color: var(--loss);
-}
+.sum-item.gain .sum-val { color: var(--gain); }
+.sum-item.loss .sum-val { color: var(--loss); }
 
 .portfolio-bar {
     height: 4px;
@@ -1885,13 +1883,8 @@ onBeforeUnmount(() => {
     transition: width 0.6s ease;
 }
 
-.portfolio-fill.gain {
-    background: var(--gain);
-}
-
-.portfolio-fill.loss {
-    background: var(--loss);
-}
+.portfolio-fill.gain { background: var(--gain); }
+.portfolio-fill.loss { background: var(--loss); }
 
 .portfolio-pct {
     font-size: 12px;
@@ -1900,15 +1893,9 @@ onBeforeUnmount(() => {
     font-family: var(--mono);
 }
 
-.portfolio-pct.gain {
-    color: var(--gain);
-}
+.portfolio-pct.gain { color: var(--gain); }
+.portfolio-pct.loss { color: var(--loss); }
 
-.portfolio-pct.loss {
-    color: var(--loss);
-}
-
-/* ── Empty State ── */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -1920,10 +1907,7 @@ onBeforeUnmount(() => {
     border: 1.5px dashed var(--border);
 }
 
-.empty-icon {
-    font-size: 24px;
-    color: var(--text-3);
-}
+.empty-icon { font-size: 24px; color: var(--text-3); }
 
 .empty-state p {
     font-size: 13px;
@@ -1932,7 +1916,6 @@ onBeforeUnmount(() => {
     text-align: center;
 }
 
-/* ── Footer ── */
 .footer {
     text-align: center;
     padding: 20px 16px;
@@ -1942,109 +1925,50 @@ onBeforeUnmount(() => {
     border-top: 1px solid var(--border);
 }
 
-/* ── Transitions ── */
 @keyframes priceFlipOut {
-    to {
-        opacity: 0;
-        transform: translateY(10px) rotateX(20deg);
-    }
+    to { opacity: 0; transform: translateY(10px) rotateX(20deg); }
 }
 
 @keyframes priceFlipIn {
-    from {
-        opacity: 0;
-        transform: translateY(-10px) rotateX(-20deg);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0) rotateX(0);
-    }
+    from { opacity: 0; transform: translateY(-10px) rotateX(-20deg); }
+    to { opacity: 1; transform: translateY(0) rotateX(0); }
 }
 
-.price-flip-leave-active {
-    animation: priceFlipOut 0.18s ease-in forwards;
-}
+.price-flip-leave-active { animation: priceFlipOut 0.18s ease-in forwards; }
+.price-flip-enter-active { animation: priceFlipIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-.price-flip-enter-active {
-    animation: priceFlipIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 
-.fade-enter-active,
-.fade-leave-active {
-    transition: opacity 0.3s;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-    opacity: 0;
-}
-
-.slide-down-enter-active,
-.slide-down-leave-active {
+.slide-down-enter-active, .slide-down-leave-active {
     transition: all 0.3s ease;
     overflow: hidden;
 }
 
-.slide-down-enter-from,
-.slide-down-leave-to {
+.slide-down-enter-from, .slide-down-leave-to {
     opacity: 0;
     transform: translateY(-10px);
     max-height: 0;
 }
 
-.slide-down-enter-to,
-.slide-down-leave-from {
-    max-height: 700px;
-}
+.slide-down-enter-to, .slide-down-leave-from { max-height: 700px; }
 
-/* ── Responsive ── */
 @media (min-width: 480px) {
-    .main {
-        padding: 16px 16px 72px;
-    }
-
-    .unit-grid {
-        grid-template-columns: repeat(6, 1fr);
-    }
-
-    .chips-scroll {
-        overflow: visible;
-        flex-wrap: wrap;
-    }
-
-    .form-grid {
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    }
-
-    .purchases-list {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .summary .sum-row {
-        grid-template-columns: repeat(3, 1fr);
-    }
+    .main { padding: 16px 16px 72px; }
+    .unit-grid { grid-template-columns: repeat(6, 1fr); }
+    .chips-scroll { overflow: visible; flex-wrap: wrap; }
+    .form-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    .purchases-list { display: grid; grid-template-columns: repeat(2, 1fr); }
+    .summary .sum-row { grid-template-columns: repeat(3, 1fr); }
 }
 
 @media (min-width: 640px) {
-    .card {
-        padding: 22px 20px;
-    }
-
-    .header-inner {
-        padding: 12px 20px;
-    }
+    .card { padding: 22px 20px; }
+    .header-inner { padding: 12px 20px; }
 }
 
-/* ── Safe area (iPhone notch/home bar) ── */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
-    .main {
-        padding-bottom: calc(72px + env(safe-area-inset-bottom));
-    }
-
-    .header {
-        padding-top: env(safe-area-inset-top);
-    }
+    .main { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+    .header { padding-top: env(safe-area-inset-top); }
 }
 </style>
