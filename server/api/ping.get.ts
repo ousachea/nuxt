@@ -1,7 +1,7 @@
-import { defineEventHandler, setHeader } from 'h3'
-
 export default defineEventHandler((event) => {
-    setHeader(event, 'Cache-Control', 'no-store, no-cache')
-    setHeader(event, 'Access-Control-Allow-Origin', '*')
+    setResponseHeaders(event, {
+        'Cache-Control': 'no-store, no-cache',
+        'Content-Type': 'application/json',
+    })
     return { ok: true, ts: Date.now() }
 })

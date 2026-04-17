@@ -1,28 +1,25 @@
-import { defineEventHandler, setHeader, readRawBody } from 'h3'
-
-export default defineEventHandler(async (event) => {
-    setHeader(event, 'Cache-Control', 'no-store, no-cache')
-    setHeader(event, 'Access-Control-Allow-Origin', '*')
-
-    const start = Date.now()
-
-    // Drain the request body without storing it
-    const req = event.node.req
-    let received = 0
-
-    await new Promise<void>((resolve, reject) => {
-        req.on('data', (chunk: Buffer) => { received += chunk.length })
-        req.on('end', resolve)
-        req.on('error', reject)
+export default defineEventHandler((event) => {
+    setResponseHeaders(event, {
+        'Cache-Control': 'no-store, no-cache',
+        'Content-Type': 'application/json',
     })
 
-    const elapsed = Date.now() - start
+    const req = event.node.req
+    const start = Date.now()
+    let received = 0
 
-    return {
-        received, // bytes
-        elapsed,  // ms
-        mbps: received > 0 && elapsed > 0
-            ? +((received * 8) / 1e6 / (elapsed / 1000)).toFixed(2)
-            : 0,
-    }
+    return new Promise<{ received: number; elapsed: number; mbps: number }>((resolve, reject) => {
+        req.on('data', (chunk: Buffer) => { received += chunk.length })
+        req.on('end', () => {
+            const elapsed = Date.now() - start
+            resolve({
+                received,
+                elapsed,
+                mbps: received > 0 && elapsed > 0
+                    ? +((received * 8) / 1e6 / (elapsed / 1000)).toFixed(2)
+                    : 0,
+            })
+        })
+        req.on('error', reject)
+    })
 })

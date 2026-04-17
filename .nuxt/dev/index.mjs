@@ -1,5 +1,5 @@
 import process from 'node:process';globalThis._importMeta_={url:import.meta.url,env:process.env};import { tmpdir } from 'node:os';
-import { defineEventHandler, handleCacheHeaders, splitCookiesString, createEvent, fetchWithEvent, isEvent, eventHandler, setHeaders, sendRedirect, proxyRequest, getRequestHeader, setResponseHeaders, setResponseStatus, send, getRequestHeaders, setResponseHeader, appendResponseHeader, getRequestURL, getResponseHeader, removeResponseHeader, createError, getQuery as getQuery$1, readBody, createApp, createRouter as createRouter$1, toNodeListener, lazyEventHandler, getResponseStatus, getRouterParam, setHeader, getResponseStatusText } from 'file:///home/ousachea/nuxt/node_modules/.pnpm/h3@1.15.6/node_modules/h3/dist/index.mjs';
+import { defineEventHandler, handleCacheHeaders, splitCookiesString, createEvent, fetchWithEvent, isEvent, eventHandler, setHeaders, sendRedirect, proxyRequest, getRequestHeader, setResponseHeaders, setResponseStatus, send, getRequestHeaders, setResponseHeader, appendResponseHeader, getRequestURL, getResponseHeader, removeResponseHeader, createError, getQuery as getQuery$1, readBody, createApp, createRouter as createRouter$1, toNodeListener, lazyEventHandler, getResponseStatus, getRouterParam, getResponseStatusText } from 'file:///home/ousachea/nuxt/node_modules/.pnpm/h3@1.15.6/node_modules/h3/dist/index.mjs';
 import { Server } from 'node:http';
 import { resolve, dirname, join } from 'node:path';
 import nodeCrypto from 'node:crypto';
@@ -2121,16 +2121,16 @@ _wH6JrtIxmaSoA8lCPWFnE9z4lQeXW6H5z3l5aymEQw
 const assets = {
   "/index.mjs": {
     "type": "text/javascript; charset=utf-8",
-    "etag": "\"1ad3f-lyGIWmqBttD656gPrl582ZhVKEw\"",
-    "mtime": "2026-04-17T04:58:07.980Z",
-    "size": 109887,
+    "etag": "\"1ad97-L6xKdg6ixarIxrd4TSidw35GXKc\"",
+    "mtime": "2026-04-17T06:23:08.648Z",
+    "size": 109975,
     "path": "index.mjs"
   },
   "/index.mjs.map": {
     "type": "application/json",
-    "etag": "\"6c214-HR5G3krPlF+FJAp2WiOq8p7zuCQ\"",
-    "mtime": "2026-04-17T04:58:07.980Z",
-    "size": 442900,
+    "etag": "\"6c47e-nk2XHSJj1218f/m1PepMbg76KZU\"",
+    "mtime": "2026-04-17T06:23:08.648Z",
+    "size": 443518,
     "path": "index.mjs.map"
   }
 };
@@ -2952,55 +2952,39 @@ const styles$1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   default: styles
 }, Symbol.toStringTag, { value: 'Module' }));
 
-const PAYLOAD_SIZE = 20 * 1024 * 1024;
-const CHUNK_SIZE = 64 * 1024;
-const downloadTest_get = defineEventHandler(async (event) => {
-  setHeader(event, "Content-Type", "application/octet-stream");
-  setHeader(event, "Content-Length", PAYLOAD_SIZE.toString());
-  setHeader(event, "Cache-Control", "no-store, no-cache");
-  setHeader(event, "Access-Control-Allow-Origin", "*");
-  const stream = new ReadableStream({
-    start(controller) {
-      let sent = 0;
-      function push() {
-        while (sent < PAYLOAD_SIZE) {
-          const remaining = PAYLOAD_SIZE - sent;
-          const size = Math.min(CHUNK_SIZE, remaining);
-          const chunk = Buffer.alloc(size);
-          controller.enqueue(chunk);
-          sent += size;
-        }
-        controller.close();
-      }
-      push();
-    }
-  });
-  return sendStream(event, stream);
-});
-function sendStream(event, stream) {
-  const res = event.node.res;
-  res.writeHead(200, {
+const downloadTest_get = defineEventHandler((event) => {
+  const query = getQuery$1(event);
+  const mbParam = Number(query.mb);
+  const MB = Number.isFinite(mbParam) && mbParam > 0 && mbParam <= 50 ? mbParam : 20;
+  const TOTAL = MB * 1024 * 1024;
+  const CHUNK = 64 * 1024;
+  setResponseHeaders(event, {
     "Content-Type": "application/octet-stream",
-    "Content-Length": PAYLOAD_SIZE,
-    "Cache-Control": "no-store"
+    "Content-Length": String(TOTAL),
+    "Cache-Control": "no-store, no-cache"
   });
-  const reader = stream.getReader();
+  const res = event.node.res;
+  const chunk = Buffer.alloc(CHUNK);
+  let sent = 0;
   return new Promise((resolve, reject) => {
-    function pump() {
-      reader.read().then(({ done, value }) => {
-        if (done) {
-          res.end();
-          return resolve();
+    function write() {
+      let ok = true;
+      while (sent < TOTAL && ok) {
+        const size = Math.min(CHUNK, TOTAL - sent);
+        const slice = chunk.subarray(0, size);
+        sent += size;
+        if (sent >= TOTAL) {
+          res.end(slice, resolve);
+          return;
         }
-        res.write(Buffer.from(value), (err) => {
-          if (err) return reject(err);
-          pump();
-        });
-      }).catch(reject);
+        ok = res.write(slice);
+      }
+      if (!ok) res.once("drain", write);
     }
-    pump();
+    res.on("error", reject);
+    write();
   });
-}
+});
 
 const downloadTest_get$1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
@@ -3008,8 +2992,10 @@ const downloadTest_get$1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.define
 }, Symbol.toStringTag, { value: 'Module' }));
 
 const ping_get = defineEventHandler((event) => {
-  setHeader(event, "Cache-Control", "no-store, no-cache");
-  setHeader(event, "Access-Control-Allow-Origin", "*");
+  setResponseHeaders(event, {
+    "Cache-Control": "no-store, no-cache",
+    "Content-Type": "application/json"
+  });
   return { ok: true, ts: Date.now() };
 });
 
@@ -3018,27 +3004,28 @@ const ping_get$1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty
   default: ping_get
 }, Symbol.toStringTag, { value: 'Module' }));
 
-const uploadTest_post = defineEventHandler(async (event) => {
-  setHeader(event, "Cache-Control", "no-store, no-cache");
-  setHeader(event, "Access-Control-Allow-Origin", "*");
-  const start = Date.now();
+const uploadTest_post = defineEventHandler((event) => {
+  setResponseHeaders(event, {
+    "Cache-Control": "no-store, no-cache",
+    "Content-Type": "application/json"
+  });
   const req = event.node.req;
+  const start = Date.now();
   let received = 0;
-  await new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     req.on("data", (chunk) => {
       received += chunk.length;
     });
-    req.on("end", resolve);
+    req.on("end", () => {
+      const elapsed = Date.now() - start;
+      resolve({
+        received,
+        elapsed,
+        mbps: received > 0 && elapsed > 0 ? +(received * 8 / 1e6 / (elapsed / 1e3)).toFixed(2) : 0
+      });
+    });
     req.on("error", reject);
   });
-  const elapsed = Date.now() - start;
-  return {
-    received,
-    // bytes
-    elapsed,
-    // ms
-    mbps: received > 0 && elapsed > 0 ? +(received * 8 / 1e6 / (elapsed / 1e3)).toFixed(2) : 0
-  };
 });
 
 const uploadTest_post$1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
