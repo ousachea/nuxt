@@ -300,7 +300,7 @@ export const DEFAULT_ARTISTS = [
     {
       name: 'Hana Haruna ', cover: '',
       url: '',  // Custom cover
-      compilations: [''], mainWorks: ['JUFD-867', 'PKPT-015', 'TOEN-020', 'UFE-084', 'VRTM-446', 'GANA-2100']
+      compilations: [''], mainWorks: ['JUFD-867', 'PKPT-015', 'TOEN-020', 'UFE-084', 'VRTM-446', 'GANA-2100','NGOD-142','JUFE-084']
     },
     {
       name: 'Hana Himesaki', cover: 'NSFS-012',
