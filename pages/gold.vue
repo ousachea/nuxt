@@ -17,7 +17,8 @@
                     </div>
                 </div>
                 <div class="header-controls">
-                    <button class="ctrl-btn" @click="scrollToPurchases" :aria-label="t.myPurchases" :title="t.myPurchases">
+                    <button class="ctrl-btn" @click="scrollToPurchases" :aria-label="t.myPurchases"
+                        :title="t.myPurchases">
                         <span>💰</span>
                     </button>
                     <button class="ctrl-btn" @click="toggleDark" :aria-label="isDark ? 'Light mode' : 'Dark mode'">
@@ -37,8 +38,17 @@
         <!-- Sticky Price Pill -->
         <div class="sticky-price" :class="{ visible: showStickyPrice && goldPrice }">
             <span class="sticky-gem">◈</span>
-            <span class="sticky-val">${{ goldPrice?.toFixed(2) ?? '——' }}</span>
-            <span class="sticky-unit">/ oz</span>
+            <div class="sticky-prices">
+                <div class="sticky-row-main">
+                    <span class="sticky-val">${{ goldPrice?.toFixed(2) ?? '——' }}</span>
+                    <span class="sticky-unit">/ troy oz</span>
+                </div>
+                <div class="sticky-row-sub" v-if="goldPrice">
+                    <span class="sticky-val-sub">${{ (goldPrice / 31.1035 * 37.5).toFixed(2) }}</span>
+                    <span class="sticky-unit-sub">/ damlung</span>
+                </div>
+            </div>
+            <div class="sticky-divider" v-if="goldPrice"></div>
             <button class="sticky-refresh" @click="fetchPrice" :disabled="loading">↻</button>
         </div>
 
@@ -68,7 +78,8 @@
                     <transition name="price-flip" mode="out-in">
                         <div class="hero-price" :key="goldPrice?.toFixed(0) ?? 'null'">
                             <span class="price-dollar">$</span>
-                            <span class="price-int">{{ goldPrice ? Math.floor(goldPrice).toLocaleString() : '——' }}</span>
+                            <span class="price-int">{{ animatedPrice ? Math.floor(animatedPrice).toLocaleString() : '——'
+                                }}</span>
                             <span v-if="goldPrice" class="price-dec">.{{ (goldPrice % 1).toFixed(2).slice(2) }}</span>
                         </div>
                     </transition>
@@ -76,8 +87,10 @@
                 </div>
 
                 <!-- Per-unit chips -->
-                <div v-if="goldPrice" class="chips-scroll">
-                    <div v-for="u in priceUnits" :key="u.key" class="chip">
+                <div v-if="goldPrice" class="chips-scroll" :key="goldPrice">
+                    <div v-for="(u, idx) in priceUnits" :key="u.key" class="chip chip-shimmer"
+                        :style="{ animationDelay: (idx * 0.08) + 's' }">
+                        <div class="shimmer-line"></div>
                         <span class="chip-label">{{ t[u.key] || u.label }}</span>
                         <span class="chip-price">${{ u.price < 1 ? u.price.toFixed(4) : u.price.toFixed(2) }}</span>
                     </div>
@@ -181,7 +194,7 @@
             </section>
 
             <!-- ── PURCHASES ── -->
-            <section class="card" id="purchases-section">
+            <section class="card" id="purchases-section" :class="{ 'section-glow': purchasesGlow }">
                 <div class="section-header">
                     <h2 class="section-title">{{ t.myPurchases }}</h2>
                     <div class="section-actions">
@@ -196,33 +209,20 @@
 
                 <!-- ── PASSWORD GATE ── -->
                 <div v-if="purchasesLocked" class="pw-gate">
-                    <!-- Set new password -->
-                    <div v-if="!hasPwSet || isSettingPw" class="pw-box">
-                        <div class="pw-icon">🔐</div>
-                        <p class="pw-title">{{ isSettingPw ? t.changePw : t.setPw }}</p>
-                        <input v-model="pwInput" class="text-input" type="password"
-                            :placeholder="t.newPwPlaceholder" @keyup.enter="setupPassword" autocomplete="new-password" />
-                        <input v-model="pwConfirm" class="text-input" type="password"
-                            :placeholder="t.confirmPw" @keyup.enter="setupPassword" autocomplete="new-password" />
-                        <transition name="fade">
-                            <p v-if="pwError" class="pw-error">{{ pwError }}</p>
-                        </transition>
-                        <button class="primary-btn full-btn" @click="setupPassword">✦ {{ t.setPwBtn }}</button>
-                        <button v-if="isSettingPw" class="ghost-btn full-btn" @click="isSettingPw = false; pwError = ''">{{ t.cancel }}</button>
-                    </div>
-
-                    <!-- Unlock -->
-                    <div v-else class="pw-box">
-                        <div class="pw-icon">🔒</div>
+                    <div class="pw-box">
+                        <div class="burst-ring-wrap" :class="{ burst: pwUnlockBurst }">
+                            <div class="burst-r1"></div>
+                            <div class="burst-r2"></div>
+                            <div class="pw-icon" :class="{ shake: pwShake }">🔒</div>
+                        </div>
                         <p class="pw-title">{{ t.locked }}</p>
-                        <input v-model="pwInput" class="text-input" type="password"
-                            :placeholder="t.enterPw" @keyup.enter="unlockPurchases" autocomplete="current-password" />
+                        <p class="pw-sub">{{ t.pwSub }}</p>
+                        <input v-model="pwInput" class="text-input" type="password" :placeholder="t.enterPw"
+                            @keyup.enter="unlockPurchases" autocomplete="current-password" />
                         <transition name="fade">
                             <p v-if="pwError" class="pw-error">{{ pwError }}</p>
                         </transition>
                         <button class="primary-btn full-btn" @click="unlockPurchases">{{ t.unlock }}</button>
-                        <button class="ghost-btn full-btn" style="margin-top:4px"
-                            @click="isSettingPw = true; pwError = ''; pwInput = ''">{{ t.changePw }}</button>
                     </div>
                 </div>
 
@@ -266,21 +266,24 @@
 
                     <!-- Purchase Cards -->
                     <div v-if="purchases.length" class="purchases-list">
-                        <div v-for="(p, i) in purchases" :key="p.id" class="p-card" :style="{
-                            borderLeftColor: gainLoss(p) >= 0 ? 'var(--gain)' : 'var(--loss)',
-                            borderColor: gainLoss(p) >= 0 ? 'var(--gain-border)' : 'var(--loss-border)',
-                            background: gainLoss(p) >= 0 ? 'var(--gain-bg)' : 'var(--loss-bg)'
-                        }">
+                        <div v-for="(p, i) in purchases" :key="p.id" class="p-card p-card-stagger" :style="{
+        borderLeftColor: gainLoss(p) >= 0 ? 'var(--gain)' : 'var(--loss)',
+        borderColor: gainLoss(p) >= 0 ? 'var(--gain-border)' : 'var(--loss-border)',
+        background: gainLoss(p) >= 0 ? 'var(--gain-bg)' : 'var(--loss-bg)',
+        animationDelay: (i * 0.07) + 's'
+    }">
                             <template v-if="editIdx !== i">
                                 <!-- Card Header -->
                                 <div class="pcard-header">
                                     <div class="pcard-weight-row">
-                                        <span class="pcard-weight">{{ p.weight }} <span class="pcard-unit">{{ t[p.unit] || p.unit }}</span></span>
+                                        <span class="pcard-weight">{{ p.weight }} <span class="pcard-unit">{{ t[p.unit]
+        || p.unit }}</span></span>
                                         <span class="pcard-date">{{ formatDate(p.date) }}</span>
                                     </div>
                                     <div class="pcard-btns">
                                         <button class="pcard-btn" @click="startEdit(i)" :aria-label="t.edit">✎</button>
-                                        <button class="pcard-btn danger" @click="removePurchase(i)" :aria-label="t.delete">✕</button>
+                                        <button class="pcard-btn danger" @click="removePurchase(i)"
+                                            :aria-label="t.delete">✕</button>
                                     </div>
                                 </div>
                                 <!-- GL Bar -->
@@ -292,12 +295,15 @@
                                     <div class="gl-divider" />
                                     <div class="gl-col">
                                         <span class="gl-label">{{ t.current }}</span>
-                                        <span class="gl-val" :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">${{ currentValue(p).toFixed(2) }}</span>
+                                        <span class="gl-val" :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">${{
+        currentValue(p).toFixed(2) }}</span>
                                     </div>
                                     <div class="gl-divider" />
                                     <div class="gl-col">
-                                        <span class="gl-label">{{ t.gainLoss }}</span>
-                                        <span class="gl-val gl-main" :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">
+                                        <span class="gl-label" :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">{{
+        gainLoss(p) >= 0 ? t.gain : t.loss }}</span>
+                                        <span class="gl-val gl-main"
+                                            :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">
                                             {{ gainLoss(p) >= 0 ? '+' : '' }}${{ gainLoss(p).toFixed(2) }}
                                         </span>
                                     </div>
@@ -309,17 +315,20 @@
                                 <div class="form-grid">
                                     <div class="form-field">
                                         <label>{{ t.weight }}</label>
-                                        <input v-model.number="editDraft.weight" type="text" inputmode="decimal" class="text-input" />
+                                        <input v-model.number="editDraft.weight" type="text" inputmode="decimal"
+                                            class="text-input" />
                                     </div>
                                     <div class="form-field">
                                         <label>{{ t.unit }}</label>
                                         <select v-model="editDraft.unit" class="text-input">
-                                            <option v-for="u in converterUnits" :key="u" :value="u">{{ t[u] || u }}</option>
+                                            <option v-for="u in converterUnits" :key="u" :value="u">{{ t[u] || u }}
+                                            </option>
                                         </select>
                                     </div>
                                     <div class="form-field">
                                         <label>{{ t.pricePaid }}</label>
-                                        <input v-model.number="editDraft.price" type="text" inputmode="decimal" class="text-input" />
+                                        <input v-model.number="editDraft.price" type="text" inputmode="decimal"
+                                            class="text-input" />
                                     </div>
                                     <div class="form-field">
                                         <label>{{ t.date }}</label>
@@ -328,7 +337,8 @@
                                 </div>
                                 <div class="edit-actions">
                                     <button class="primary-btn" style="flex:1" @click="saveEdit">{{ t.save }}</button>
-                                    <button class="ghost-btn" style="flex:1" @click="editIdx = null">{{ t.cancel }}</button>
+                                    <button class="ghost-btn" style="flex:1" @click="editIdx = null">{{ t.cancel
+                                        }}</button>
                                 </div>
                             </template>
                         </div>
@@ -376,7 +386,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TROY = 31.1035
@@ -390,13 +400,13 @@ const converterUnits = ['li', 'hun', 'chi', 'gram', 'damlung', 'troyOz']
 // ─── Pre-loaded purchases (owner only) ───────────────────────────────────────
 const OWNER_PW_HASH = '5b91bc1234678bc03abe05d9966d30d1911a16d510605ea015b37cd3be316e05' // sha256("ousa123")
 const PRE_PURCHASES = [
-    { id: 'pre_1', weight: 1,  unit: 'chi', price: 610,  date: '2024-01-01' },
-    { id: 'pre_2', weight: 1,  unit: 'chi', price: 518,  date: '2024-01-01' },
-    { id: 'pre_3', weight: 1,  unit: 'chi', price: 590,  date: '2024-01-01' },
-    { id: 'pre_4', weight: 1,  unit: 'chi', price: 505,  date: '2024-01-01' },
-    { id: 'pre_5', weight: 3,  unit: 'chi', price: 1440, date: '2024-01-01' },
-    { id: 'pre_6', weight: 2,  unit: 'chi', price: 1030, date: '2024-01-01' },
-    { id: 'pre_7', weight: 5,  unit: 'chi', price: 2000, date: '2024-01-01' },
+    { id: 'pre_1', weight: 1, unit: 'chi', price: 610, date: '2024-01-01' },
+    { id: 'pre_2', weight: 1, unit: 'chi', price: 518, date: '2024-01-01' },
+    { id: 'pre_3', weight: 1, unit: 'chi', price: 590, date: '2024-01-01' },
+    { id: 'pre_4', weight: 1, unit: 'chi', price: 505, date: '2024-01-01' },
+    { id: 'pre_5', weight: 3, unit: 'chi', price: 1440, date: '2024-01-01' },
+    { id: 'pre_6', weight: 2, unit: 'chi', price: 1030, date: '2024-01-01' },
+    { id: 'pre_7', weight: 5, unit: 'chi', price: 2000, date: '2024-01-01' },
     { id: 'pre_8', weight: 10, unit: 'chi', price: 4900, date: '2024-01-01' },
 ]
 
@@ -423,12 +433,36 @@ const editIdx = ref(null)
 const editDraft = ref({})
 const csvInput = ref(null)
 
+// ─── Animation State ─────────────────────────────────────────────────────────
+const animatedPrice = ref(null)
+let priceCounterTimer = null
+
+function animateCounterTo(target) {
+    if (priceCounterTimer) clearInterval(priceCounterTimer)
+    const start = animatedPrice.value || 0
+    const duration = 900
+    const step = 16
+    const totalSteps = duration / step
+    const increment = (target - start) / totalSteps
+    let current = start
+    priceCounterTimer = setInterval(() => {
+        current += increment
+        if ((increment > 0 && current >= target) || (increment < 0 && current <= target)) {
+            current = target
+            clearInterval(priceCounterTimer)
+        }
+        animatedPrice.value = current
+    }, step)
+}
+
 // ─── Password State ───────────────────────────────────────────────────────────
 const purchasesLocked = ref(true)
+const isOwner = ref(false)
 const pwInput = ref('')
-const pwConfirm = ref('')
 const pwError = ref('')
-const isSettingPw = ref(false)
+const pwShake = ref(false)
+const pwUnlockBurst = ref(false)
+const purchasesGlow = ref(false)
 
 // ─── i18n ────────────────────────────────────────────────────────────────────
 const translations = {
@@ -456,6 +490,8 @@ const translations = {
         paid: 'Paid',
         current: 'Current',
         gainLoss: 'G / L',
+        gain: 'Gain',
+        loss: 'Loss',
         portfolioSummary: 'Portfolio',
         totalInvested: 'Invested',
         currentValue: 'Value Now',
@@ -477,14 +513,10 @@ const translations = {
         offlineWarning: 'You are offline — prices may be outdated',
         noPurchases: 'No purchases yet. Tap + Add above.',
         lock: 'Lock purchases',
-        locked: 'Purchases locked',
+        locked: 'Enter password to view purchases',
+        pwSub: 'Use your own password to see your purchases, or the shared password to see shared purchases.',
         unlock: 'Unlock',
-        setPw: 'Set a password to protect your purchases',
-        setPwBtn: 'Set Password',
-        changePw: 'Change password',
-        newPwPlaceholder: 'New password (min 4 chars)',
-        confirmPw: 'Confirm password',
-        enterPw: 'Enter password',
+        enterPw: 'Enter any password…',
     },
     km: {
         title: 'តាមដានមាស',
@@ -510,6 +542,8 @@ const translations = {
         paid: 'បង់',
         current: 'បច្ចុប្បន្ន',
         gainLoss: 'ចំណេញ/ខាត',
+        gain: 'ចំណេញ',
+        loss: 'ខាត',
         portfolioSummary: 'សង្ខេប',
         totalInvested: 'វិនិយោគ',
         currentValue: 'តម្លៃ',
@@ -531,20 +565,13 @@ const translations = {
         offlineWarning: '⚠ ក្រៅបណ្តាញ',
         noPurchases: 'មិនទាន់មានការទិញ។ ចុច + បន្ថែម',
         lock: 'ចាក់សោ',
-        locked: 'ការទិញត្រូវបានចាក់សោ',
+        locked: 'បញ្ចូលពាក្យសម្ងាត់ដើម្បីមើលការទិញ',
+        pwSub: 'ប្រើពាក្យសម្ងាត់របស់អ្នក ឬពាក្យសម្ងាត់រួម។',
         unlock: 'ដោះសោ',
-        setPw: 'កំណត់ពាក្យសម្ងាត់ដើម្បីការពារការទិញ',
-        setPwBtn: 'កំណត់ពាក្យសម្ងាត់',
-        changePw: 'ផ្លាស់ប្តូរពាក្យសម្ងាត់',
-        newPwPlaceholder: 'ពាក្យសម្ងាត់ថ្មី (យ៉ាងហោចណាស់ ៤)',
-        confirmPw: 'បញ្ជាក់ពាក្យសម្ងាត់',
-        enterPw: 'បញ្ចូលពាក្យសម្ងាត់',
+        enterPw: 'បញ្ចូលពាក្យសម្ងាត់…',
     }
 }
 const t = computed(() => translations[lang.value])
-
-// ─── Password Computed ────────────────────────────────────────────────────────
-const hasPwSet = computed(() => !!localStorage.getItem('gt4_pwhash'))
 
 // ─── Price computations ───────────────────────────────────────────────────────
 const pricePerGram = computed(() => goldPrice.value ? goldPrice.value / TROY : 0)
@@ -601,6 +628,7 @@ function applyCustomPrice() {
     else if (priceMethod.value === 'damlung') goldPrice.value = (p / DAMLUNG) * TROY
     else if (priceMethod.value === 'chi') goldPrice.value = (p / CHI) * TROY
     lastUpdated.value = new Date().toLocaleTimeString() + ' (custom)'
+    animateCounterTo(goldPrice.value)
     save()
 }
 
@@ -618,47 +646,53 @@ async function sha256(str) {
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-async function setupPassword() {
-    if (!pwInput.value || pwInput.value.length < 4) {
-        pwError.value = 'Min 4 characters'; return
-    }
-    if (pwInput.value !== pwConfirm.value) {
-        pwError.value = 'Passwords do not match'; return
-    }
-    const hash = await sha256(pwInput.value)
-    localStorage.setItem('gt4_pwhash', hash)
-    purchasesLocked.value = false
-    isSettingPw.value = false
-    pwInput.value = ''; pwConfirm.value = ''; pwError.value = ''
-    flash('✓ Password set')
-}
-
 async function unlockPurchases() {
-    if (!pwInput.value) { pwError.value = 'Enter your password'; return }
-    const hash = await sha256(pwInput.value)
-    if (hash === localStorage.getItem('gt4_pwhash')) {
-        // If owner password — merge pre-purchases (avoid duplicates)
-        if (hash === OWNER_PW_HASH) {
-            const existingIds = new Set(purchases.value.map(p => p.id))
-            const toAdd = PRE_PURCHASES.filter(p => !existingIds.has(p.id))
-            if (toAdd.length) { purchases.value = [...toAdd, ...purchases.value]; save() }
-        }
-        purchasesLocked.value = false
-        pwInput.value = ''; pwError.value = ''
-    } else {
-        pwError.value = 'Wrong password'
-        pwInput.value = ''
+    if (!pwInput.value) {
+        pwError.value = 'Enter a password'
+        pwShake.value = false
+        await nextTick(); pwShake.value = true
+        setTimeout(() => pwShake.value = false, 600)
+        return
     }
-}
+    const hash = await sha256(pwInput.value)
 
-function scrollToPurchases() {
-    const el = document.getElementById('purchases-section')
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (hash === OWNER_PW_HASH) {
+        // Owner — pre-purchases + any extras they added
+        isOwner.value = true
+        const extra = JSON.parse(localStorage.getItem('gt4_owner_extra') || '[]')
+        purchases.value = [...PRE_PURCHASES, ...extra]
+    } else {
+        // Regular user — their own purchases stored under their password hash key
+        isOwner.value = false
+        const userKey = 'gt4_u_' + hash.slice(0, 16)
+        sessionStorage.setItem('gt4_ukey', userKey) // remember key for this session
+        purchases.value = JSON.parse(localStorage.getItem(userKey) || '[]')
+    }
+
+    pwUnlockBurst.value = true
+    setTimeout(() => pwUnlockBurst.value = false, 800)
+    purchasesLocked.value = false
+    pwInput.value = ''; pwError.value = ''
 }
 
 function lockPurchases() {
     purchasesLocked.value = true
-    pwInput.value = ''; pwError.value = ''; isSettingPw.value = false
+    isOwner.value = false
+    purchases.value = []
+    pwInput.value = ''; pwError.value = ''
+    sessionStorage.removeItem('gt4_ukey')
+}
+
+function scrollToPurchases() {
+    const el = document.getElementById('purchases-section')
+    if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        purchasesGlow.value = false
+        setTimeout(() => {
+            purchasesGlow.value = true
+            setTimeout(() => purchasesGlow.value = false, 1000)
+        }, 300)
+    }
 }
 
 // ─── Price Fetch ──────────────────────────────────────────────────────────────
@@ -689,6 +723,7 @@ async function fetchPrice() {
 
     if (ok) {
         lastUpdated.value = new Date().toLocaleTimeString()
+        animateCounterTo(goldPrice.value)
         save(); flash(t.value.pricesUpdated)
     } else {
         const cached = load()?.goldPrice
@@ -762,12 +797,23 @@ function importCSV(e) {
 // ─── Persistence ──────────────────────────────────────────────────────────────
 function save() {
     try {
+        // Save app settings
         localStorage.setItem('gt4', JSON.stringify({
             lang: lang.value, isDark: isDark.value, goldPrice: goldPrice.value,
-            lastUpdated: lastUpdated.value, purchases: purchases.value,
-            priceMethod: priceMethod.value, customPrice: customPrice.value,
-            customApiUrl: customApiUrl.value, priceSource: priceSource.value,
+            lastUpdated: lastUpdated.value, priceMethod: priceMethod.value,
+            customPrice: customPrice.value, customApiUrl: customApiUrl.value,
+            priceSource: priceSource.value,
         }))
+        // Save purchases per user type
+        if (!purchasesLocked.value) {
+            if (isOwner.value) {
+                const extra = purchases.value.filter(p => !PRE_PURCHASES.find(pp => pp.id === p.id))
+                localStorage.setItem('gt4_owner_extra', JSON.stringify(extra))
+            } else {
+                const userKey = sessionStorage.getItem('gt4_ukey')
+                if (userKey) localStorage.setItem(userKey, JSON.stringify(purchases.value))
+            }
+        }
     } catch { }
 }
 function load() { try { return JSON.parse(localStorage.getItem('gt4') || 'null') } catch { return null } }
@@ -781,12 +827,12 @@ onMounted(() => {
     if (d) {
         lang.value = d.lang || 'en'; isDark.value = d.isDark ?? true
         goldPrice.value = d.goldPrice || null; lastUpdated.value = d.lastUpdated || ''
-        purchases.value = d.purchases || []; priceMethod.value = d.priceMethod || 'troyOz'
+        priceMethod.value = d.priceMethod || 'troyOz'
         customPrice.value = d.customPrice || null; customApiUrl.value = d.customApiUrl || ''
         priceSource.value = d.priceSource || 'api'
     }
-    // Lock if a password has been set
-    purchasesLocked.value = !!localStorage.getItem('gt4_pwhash')
+    // Always start locked — user must enter password to see purchases
+    purchasesLocked.value = true
     if (priceSource.value === 'api') fetchPrice()
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
@@ -900,11 +946,18 @@ onBeforeUnmount(() => {
     animation: drift 18s ease-in-out infinite alternate-reverse;
 }
 
-.app:not(.dark) .orb { opacity: 0.08; }
+.app:not(.dark) .orb {
+    opacity: 0.08;
+}
 
 @keyframes drift {
-    from { transform: translate(0, 0) scale(1); }
-    to { transform: translate(20px, 30px) scale(1.08); }
+    from {
+        transform: translate(0, 0) scale(1);
+    }
+
+    to {
+        transform: translate(20px, 30px) scale(1.08);
+    }
 }
 
 .header {
@@ -917,7 +970,9 @@ onBeforeUnmount(() => {
     border-bottom: 1px solid var(--border);
 }
 
-.app:not(.dark) .header { background: rgba(244, 241, 235, 0.92); }
+.app:not(.dark) .header {
+    background: rgba(244, 241, 235, 0.92);
+}
 
 .header-inner {
     max-width: 640px;
@@ -1011,45 +1066,93 @@ onBeforeUnmount(() => {
     position: fixed;
     top: 0;
     left: 50%;
-    transform: translateX(-50%) translateY(-56px);
+    transform: translateX(-50%) translateY(-90px);
     z-index: 99;
     background: var(--surface);
     border: 1px solid var(--gold-border);
-    border-radius: 0 0 12px 12px;
-    padding: 6px 16px;
+    border-radius: 0 0 18px 18px;
+    padding: 10px 22px;
     display: flex;
     align-items: center;
-    gap: 6px;
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    gap: 12px;
+    transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
 }
 
-.sticky-price.visible { transform: translateX(-50%) translateY(0); }
+.sticky-price.visible {
+    transform: translateX(-50%) translateY(0);
+}
 
-.sticky-gem { font-size: 12px; color: var(--gold); }
+.sticky-gem {
+    font-size: 18px;
+    color: var(--gold);
+    flex-shrink: 0;
+}
+
+.sticky-prices {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.sticky-row-main {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.sticky-row-sub {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
 
 .sticky-val {
-    font-size: 16px;
+    font-size: 22px;
     font-weight: 800;
     color: var(--gold);
     font-family: var(--mono);
+    letter-spacing: -0.5px;
 }
 
-.sticky-unit { font-size: 11px; color: var(--text-3); }
+.sticky-unit {
+    font-size: 12px;
+    color: var(--text-3);
+}
+
+.sticky-val-sub {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--gold-dim);
+    font-family: var(--mono);
+}
+
+.sticky-unit-sub {
+    font-size: 11px;
+    color: var(--text-3);
+}
+
+.sticky-divider {
+    width: 1px;
+    height: 32px;
+    background: var(--border);
+    flex-shrink: 0;
+}
 
 .sticky-refresh {
     background: none;
     border: none;
     color: var(--text-2);
     cursor: pointer;
-    font-size: 16px;
+    font-size: 20px;
     padding: 4px;
-    margin-left: 4px;
     transition: color 0.2s;
     min-height: unset;
 }
 
-.sticky-refresh:hover { color: var(--gold); }
+.sticky-refresh:hover {
+    color: var(--gold);
+}
 
 .main {
     position: relative;
@@ -1110,7 +1213,9 @@ onBeforeUnmount(() => {
     border: 1px solid var(--gold-border);
 }
 
-.hero-price-block { margin-bottom: 14px; }
+.hero-price-block {
+    margin-bottom: 14px;
+}
 
 .hero-meta-row {
     display: flex;
@@ -1181,7 +1286,9 @@ onBeforeUnmount(() => {
     padding-left: 4px;
 }
 
-.chips-scroll::-webkit-scrollbar { display: none; }
+.chips-scroll::-webkit-scrollbar {
+    display: none;
+}
 
 .chip {
     display: flex;
@@ -1225,9 +1332,17 @@ onBeforeUnmount(() => {
 }
 
 @keyframes progress {
-    0% { transform: translateX(-100%) scaleX(0.4); }
-    50% { transform: translateX(60%) scaleX(0.8); }
-    100% { transform: translateX(200%) scaleX(0.4); }
+    0% {
+        transform: translateX(-100%) scaleX(0.4);
+    }
+
+    50% {
+        transform: translateX(60%) scaleX(0.8);
+    }
+
+    100% {
+        transform: translateX(200%) scaleX(0.4);
+    }
 }
 
 .flash {
@@ -1286,7 +1401,10 @@ onBeforeUnmount(() => {
     border-radius: 6px;
 }
 
-.api-hint-text { font-size: 12px; color: var(--text-3); }
+.api-hint-text {
+    font-size: 12px;
+    color: var(--text-3);
+}
 
 .api-key-row {
     display: flex;
@@ -1300,8 +1418,14 @@ onBeforeUnmount(() => {
     line-height: 1.5;
 }
 
-.api-hint a { color: var(--gold); text-decoration: none; }
-.api-hint a:hover { text-decoration: underline; }
+.api-hint a {
+    color: var(--gold);
+    text-decoration: none;
+}
+
+.api-hint a:hover {
+    text-decoration: underline;
+}
 
 .method-tabs {
     display: flex;
@@ -1329,7 +1453,9 @@ onBeforeUnmount(() => {
     color: var(--gold);
 }
 
-.price-input-row { display: flex; }
+.price-input-row {
+    display: flex;
+}
 
 .input-prefix {
     background: var(--surface3);
@@ -1345,7 +1471,9 @@ onBeforeUnmount(() => {
     flex-shrink: 0;
 }
 
-.price-input { border-radius: 0 10px 10px 0 !important; }
+.price-input {
+    border-radius: 0 10px 10px 0 !important;
+}
 
 .text-input {
     background: var(--surface2);
@@ -1367,7 +1495,9 @@ onBeforeUnmount(() => {
     border-color: var(--gold-border);
 }
 
-.text-input::placeholder { color: var(--text-3); }
+.text-input::placeholder {
+    color: var(--text-3);
+}
 
 .primary-btn {
     display: inline-flex;
@@ -1392,15 +1522,24 @@ onBeforeUnmount(() => {
     transform: translateY(-1px);
 }
 
-.primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.primary-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
 
 .app:not(.dark) .primary-btn {
     color: #fff;
     background: var(--gold-dim);
 }
 
-.refresh-btn { flex-shrink: 0; padding: 14px 20px; }
-.full-btn { width: 100%; }
+.refresh-btn {
+    flex-shrink: 0;
+    padding: 14px 20px;
+}
+
+.full-btn {
+    width: 100%;
+}
 
 .ghost-btn {
     display: inline-flex;
@@ -1440,15 +1579,24 @@ onBeforeUnmount(() => {
     flex-shrink: 0;
 }
 
-.icon-btn-sm:hover { border-color: var(--gold-border); }
-.icon-btn-sm.danger:hover { border-color: var(--loss-border); }
+.icon-btn-sm:hover {
+    border-color: var(--gold-border);
+}
+
+.icon-btn-sm.danger:hover {
+    border-color: var(--loss-border);
+}
 
 .spin {
     display: inline-block;
     animation: spin 1s linear infinite;
 }
 
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
 
 .section-title {
     font-size: 14px;
@@ -1473,7 +1621,9 @@ onBeforeUnmount(() => {
     flex-wrap: wrap;
 }
 
-.section-header .section-title { margin-bottom: 0; }
+.section-header .section-title {
+    margin-bottom: 0;
+}
 
 .section-actions {
     display: flex;
@@ -1496,7 +1646,9 @@ onBeforeUnmount(() => {
     margin-bottom: 12px;
 }
 
-.conv-tabs-scroll::-webkit-scrollbar { display: none; }
+.conv-tabs-scroll::-webkit-scrollbar {
+    display: none;
+}
 
 .conv-tab {
     padding: 10px 14px;
@@ -1562,8 +1714,15 @@ onBeforeUnmount(() => {
     gap: 8px;
 }
 
-.conv-row:last-child { border-bottom: none; }
-.conv-label { font-size: 14px; color: var(--text-2); font-weight: 500; }
+.conv-row:last-child {
+    border-bottom: none;
+}
+
+.conv-label {
+    font-size: 14px;
+    color: var(--text-2);
+    font-weight: 500;
+}
 
 .conv-val {
     font-size: 14px;
@@ -1589,7 +1748,9 @@ onBeforeUnmount(() => {
     transition: border-color 0.2s;
 }
 
-.unit-tile:hover { border-color: var(--gold-border); }
+.unit-tile:hover {
+    border-color: var(--gold-border);
+}
 
 .tile-top {
     display: flex;
@@ -1605,7 +1766,11 @@ onBeforeUnmount(() => {
     letter-spacing: 0.06em;
 }
 
-.tile-gram { font-size: 10px; color: var(--text-3); font-family: var(--mono); }
+.tile-gram {
+    font-size: 10px;
+    color: var(--text-3);
+    font-family: var(--mono);
+}
 
 .tile-price {
     font-size: 14px;
@@ -1649,6 +1814,14 @@ onBeforeUnmount(() => {
     line-height: 1.4;
 }
 
+.pw-sub {
+    font-size: 12px;
+    color: var(--text-3);
+    text-align: center;
+    line-height: 1.5;
+    margin-bottom: 4px;
+}
+
 .pw-error {
     font-size: 13px;
     color: var(--loss);
@@ -1681,7 +1854,10 @@ onBeforeUnmount(() => {
     background: var(--gold-alpha);
 }
 
-.add-icon { font-size: 22px; line-height: 1; }
+.add-icon {
+    font-size: 22px;
+    line-height: 1;
+}
 
 .purchase-form {
     background: var(--surface2);
@@ -1750,10 +1926,23 @@ onBeforeUnmount(() => {
     font-variant-numeric: tabular-nums;
 }
 
-.pcard-unit { font-size: 13px; font-weight: 600; color: var(--text-2); }
-.pcard-date { font-size: 11px; color: var(--text-3); font-family: var(--mono); }
+.pcard-unit {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-2);
+}
 
-.pcard-btns { display: flex; gap: 6px; flex-shrink: 0; }
+.pcard-date {
+    font-size: 11px;
+    color: var(--text-3);
+    font-family: var(--mono);
+}
+
+.pcard-btns {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
 
 .pcard-btn {
     background: var(--surface3);
@@ -1770,10 +1959,20 @@ onBeforeUnmount(() => {
     justify-content: center;
 }
 
-.pcard-btn:hover { border-color: var(--gold-border); color: var(--gold); }
-.pcard-btn.danger:hover { border-color: var(--loss-border); color: var(--loss); }
+.pcard-btn:hover {
+    border-color: var(--gold-border);
+    color: var(--gold);
+}
 
-.gl-row { display: flex; align-items: stretch; }
+.pcard-btn.danger:hover {
+    border-color: var(--loss-border);
+    color: var(--loss);
+}
+
+.gl-row {
+    display: flex;
+    align-items: stretch;
+}
 
 .gl-col {
     flex: 1;
@@ -1783,8 +1982,13 @@ onBeforeUnmount(() => {
     padding: 0 4px;
 }
 
-.gl-col:first-child { padding-left: 0; }
-.gl-col:last-child { padding-right: 0; }
+.gl-col:first-child {
+    padding-left: 0;
+}
+
+.gl-col:last-child {
+    padding-right: 0;
+}
 
 .gl-divider {
     width: 1px;
@@ -1801,12 +2005,29 @@ onBeforeUnmount(() => {
     letter-spacing: 0.05em;
 }
 
-.gl-val { font-size: 13px; font-weight: 700; font-family: var(--mono); color: var(--text); }
-.gl-main { font-size: 14px; }
-.gain-text { color: var(--gain) !important; }
-.loss-text { color: var(--loss) !important; }
+.gl-val {
+    font-size: 13px;
+    font-weight: 700;
+    font-family: var(--mono);
+    color: var(--text);
+}
 
-.edit-actions { display: flex; gap: 8px; }
+.gl-main {
+    font-size: 14px;
+}
+
+.gain-text {
+    color: var(--gain) !important;
+}
+
+.loss-text {
+    color: var(--loss) !important;
+}
+
+.edit-actions {
+    display: flex;
+    gap: 8px;
+}
 
 .summary {
     background: var(--surface2);
@@ -1866,8 +2087,13 @@ onBeforeUnmount(() => {
     white-space: nowrap;
 }
 
-.sum-item.gain .sum-val { color: var(--gain); }
-.sum-item.loss .sum-val { color: var(--loss); }
+.sum-item.gain .sum-val {
+    color: var(--gain);
+}
+
+.sum-item.loss .sum-val {
+    color: var(--loss);
+}
 
 .portfolio-bar {
     height: 4px;
@@ -1883,8 +2109,13 @@ onBeforeUnmount(() => {
     transition: width 0.6s ease;
 }
 
-.portfolio-fill.gain { background: var(--gain); }
-.portfolio-fill.loss { background: var(--loss); }
+.portfolio-fill.gain {
+    background: var(--gain);
+}
+
+.portfolio-fill.loss {
+    background: var(--loss);
+}
 
 .portfolio-pct {
     font-size: 12px;
@@ -1893,8 +2124,13 @@ onBeforeUnmount(() => {
     font-family: var(--mono);
 }
 
-.portfolio-pct.gain { color: var(--gain); }
-.portfolio-pct.loss { color: var(--loss); }
+.portfolio-pct.gain {
+    color: var(--gain);
+}
+
+.portfolio-pct.loss {
+    color: var(--loss);
+}
 
 .empty-state {
     display: flex;
@@ -1907,7 +2143,10 @@ onBeforeUnmount(() => {
     border: 1.5px dashed var(--border);
 }
 
-.empty-icon { font-size: 24px; color: var(--text-3); }
+.empty-icon {
+    font-size: 24px;
+    color: var(--text-3);
+}
 
 .empty-state p {
     font-size: 13px;
@@ -1926,49 +2165,263 @@ onBeforeUnmount(() => {
 }
 
 @keyframes priceFlipOut {
-    to { opacity: 0; transform: translateY(10px) rotateX(20deg); }
+    to {
+        opacity: 0;
+        transform: translateY(10px) rotateX(20deg);
+    }
 }
 
 @keyframes priceFlipIn {
-    from { opacity: 0; transform: translateY(-10px) rotateX(-20deg); }
-    to { opacity: 1; transform: translateY(0) rotateX(0); }
+    from {
+        opacity: 0;
+        transform: translateY(-10px) rotateX(-20deg);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) rotateX(0);
+    }
 }
 
-.price-flip-leave-active { animation: priceFlipOut 0.18s ease-in forwards; }
-.price-flip-enter-active { animation: priceFlipIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.price-flip-leave-active {
+    animation: priceFlipOut 0.18s ease-in forwards;
+}
 
-.fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+.price-flip-enter-active {
+    animation: priceFlipIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
 
-.slide-down-enter-active, .slide-down-leave-active {
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity 0.3s;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+}
+
+.slide-down-enter-active,
+.slide-down-leave-active {
     transition: all 0.3s ease;
     overflow: hidden;
 }
 
-.slide-down-enter-from, .slide-down-leave-to {
+.slide-down-enter-from,
+.slide-down-leave-to {
     opacity: 0;
     transform: translateY(-10px);
     max-height: 0;
 }
 
-.slide-down-enter-to, .slide-down-leave-from { max-height: 700px; }
+.slide-down-enter-to,
+.slide-down-leave-from {
+    max-height: 700px;
+}
 
 @media (min-width: 480px) {
-    .main { padding: 16px 16px 72px; }
-    .unit-grid { grid-template-columns: repeat(6, 1fr); }
-    .chips-scroll { overflow: visible; flex-wrap: wrap; }
-    .form-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
-    .purchases-list { display: grid; grid-template-columns: repeat(2, 1fr); }
-    .summary .sum-row { grid-template-columns: repeat(3, 1fr); }
+    .main {
+        padding: 16px 16px 72px;
+    }
+
+    .unit-grid {
+        grid-template-columns: repeat(6, 1fr);
+    }
+
+    .chips-scroll {
+        overflow: visible;
+        flex-wrap: wrap;
+    }
+
+    .form-grid {
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    }
+
+    .purchases-list {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .summary .sum-row {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }
 
 @media (min-width: 640px) {
-    .card { padding: 22px 20px; }
-    .header-inner { padding: 12px 20px; }
+    .card {
+        padding: 22px 20px;
+    }
+
+    .header-inner {
+        padding: 12px 20px;
+    }
 }
 
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
-    .main { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
-    .header { padding-top: env(safe-area-inset-top); }
+    .main {
+        padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    }
+
+    .header {
+        padding-top: env(safe-area-inset-top);
+    }
+}
+
+/* ── Animation: Chip shimmer ── */
+@keyframes shimmerSwipe {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(300%);
+    }
+}
+
+.chip-shimmer {
+    position: relative;
+    overflow: hidden;
+}
+
+.chip-shimmer .shimmer-line {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 40%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(245, 200, 66, 0.3), transparent);
+    transform: translateX(-100%);
+    animation: shimmerSwipe 0.7s ease forwards;
+}
+
+/* ── Animation: Card stagger entrance ── */
+@keyframes cardSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.p-card-stagger {
+    opacity: 0;
+    animation: cardSlideIn 0.35s ease forwards;
+}
+
+/* ── Animation: Lock shake ── */
+@keyframes lockShake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    15% {
+        transform: translateX(-7px);
+    }
+
+    30% {
+        transform: translateX(7px);
+    }
+
+    45% {
+        transform: translateX(-5px);
+    }
+
+    60% {
+        transform: translateX(5px);
+    }
+
+    75% {
+        transform: translateX(-3px);
+    }
+
+    90% {
+        transform: translateX(3px);
+    }
+}
+
+.pw-icon.shake {
+    animation: lockShake 0.5s ease;
+}
+
+/* ── Animation: Unlock burst rings ── */
+@keyframes burstRing {
+    0% {
+        transform: scale(0.5);
+        opacity: 0.9;
+    }
+
+    100% {
+        transform: scale(2.4);
+        opacity: 0;
+    }
+}
+
+@keyframes burstRing2 {
+    0% {
+        transform: scale(0.5);
+        opacity: 0.6;
+    }
+
+    100% {
+        transform: scale(1.9);
+        opacity: 0;
+    }
+}
+
+.burst-ring-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.burst-r1,
+.burst-r2 {
+    position: absolute;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: 2px solid var(--gold);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.burst-r2 {
+    width: 40px;
+    height: 40px;
+    border-color: rgba(245, 200, 66, 0.5);
+}
+
+.burst-ring-wrap.burst .burst-r1 {
+    animation: burstRing 0.65s ease-out forwards;
+}
+
+.burst-ring-wrap.burst .burst-r2 {
+    animation: burstRing2 0.55s ease-out 0.1s forwards;
+}
+
+/* ── Animation: Section glow pulse ── */
+@keyframes sectionGlow {
+    0% {
+        box-shadow: 0 0 0 0 rgba(245, 200, 66, 0);
+    }
+
+    30% {
+        box-shadow: 0 0 0 8px rgba(245, 200, 66, 0.2);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(245, 200, 66, 0);
+    }
+}
+
+.section-glow {
+    animation: sectionGlow 0.9s ease-out forwards;
 }
 </style>
