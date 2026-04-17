@@ -336,11 +336,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
 }
 
 .wrap {
-    min-height: 100vh;
     font-family: 'DM Sans', sans-serif;
     max-width: 480px;
     margin: 0 auto;
-    padding: 40px 28px;
+    padding: 40px 28px 48px;
+    padding-bottom: max(48px, env(safe-area-inset-bottom, 48px));
     display: flex;
     flex-direction: column;
     background: #0c0c0f;
@@ -569,7 +569,6 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 8px;
-    margin-top: auto;
 }
 
 .flip-wrap {
@@ -611,8 +610,20 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
 }
 
 @media (max-width: 400px) {
+    .wrap {
+        padding: 28px 20px 40px;
+    }
+
+    .header {
+        margin-bottom: 36px;
+    }
+
     .big-num {
         font-size: 60px;
+    }
+
+    .go {
+        margin-bottom: 28px;
     }
 
     .metrics {
