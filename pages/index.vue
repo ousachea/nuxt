@@ -13,13 +13,15 @@
                 <span class="big-num" :class="{ pop: numPop }" :style="{ color: phaseColor.num }">{{ display }}</span>
                 <span class="big-unit">{{ displayUnit }}</span>
             </div>
-            <div class="big-label" :style="{ color: phaseColor.label }">{{ displayLabel }}</div>
+            <!-- Typewriter label -->
+            <div class="big-label" :style="{ color: phaseColor.label }">
+                {{ typedLabel }}<span class="cursor" :class="{ blink: typing }">|</span>
+            </div>
         </div>
 
         <div class="bar-wrap">
             <div class="bar-track">
-                <div class="bar-fill" :class="{ active: barPct > 0 }"
-                    :style="{ width: barPct + '%', background: phaseColor.bar }" />
+                <div class="bar-fill" :style="{ width: barPct + '%', background: phaseColor.bar }" />
                 <div class="bar-glow" :style="{ background: phaseColor.glow, opacity: barPct > 0 ? 1 : 0 }" />
             </div>
             <div class="ticks">
@@ -40,37 +42,17 @@
 
         <div v-if="error" class="error">{{ error }}</div>
 
+        <!-- Metric cards with flip animation -->
         <div class="metrics">
-            <div class="m" :class="{ lit: results.download !== '—' }">
-                <div class="m-lbl">Download</div>
-                <div>
-                    <span class="m-val" :style="{ color: results.download !== '—' ? '#34d399' : '#222' }">{{
-                    results.download }}</span>
-                    <span class="m-unit">Mbps</span>
-                </div>
-            </div>
-            <div class="m" :class="{ lit: results.upload !== '—' }">
-                <div class="m-lbl">Upload</div>
-                <div>
-                    <span class="m-val" :style="{ color: results.upload !== '—' ? '#60a5fa' : '#222' }">{{
-                    results.upload }}</span>
-                    <span class="m-unit">Mbps</span>
-                </div>
-            </div>
-            <div class="m" :class="{ lit: results.ping !== '—' }">
-                <div class="m-lbl">Ping</div>
-                <div>
-                    <span class="m-val" :style="{ color: results.ping !== '—' ? '#facc15' : '#222' }">{{ results.ping
-                        }}</span>
-                    <span class="m-unit">ms</span>
-                </div>
-            </div>
-            <div class="m" :class="{ lit: results.jitter !== '—' }">
-                <div class="m-lbl">Jitter</div>
-                <div>
-                    <span class="m-val" :style="{ color: results.jitter !== '—' ? '#facc15' : '#222' }">{{
-                        results.jitter }}</span>
-                    <span class="m-unit">ms</span>
+            <div v-for="card in metricCards" :key="card.key" class="flip-wrap">
+                <div class="flip-card" :class="{ flipping: card.flipping }">
+                    <div class="m-lbl">{{ card.label }}</div>
+                    <div>
+                        <span class="m-val" :style="{ color: card.revealed ? card.color : '#222' }">
+                            {{ results[card.key] }}
+                        </span>
+                        <span class="m-unit">{{ card.unit }}</span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -99,6 +81,13 @@ const phases = [
     { id: 'upload', label: 'Upload' },
 ]
 
+const metricCards = reactive([
+    { key: 'download', label: 'Download', unit: 'Mbps', color: '#34d399', flipping: false, revealed: false },
+    { key: 'upload', label: 'Upload', unit: 'Mbps', color: '#60a5fa', flipping: false, revealed: false },
+    { key: 'ping', label: 'Ping', unit: 'ms', color: '#facc15', flipping: false, revealed: false },
+    { key: 'jitter', label: 'Jitter', unit: 'ms', color: '#facc15', flipping: false, revealed: false },
+])
+
 const busy = ref(false)
 const currentPhase = ref('')
 const donePhases = ref([])
@@ -108,6 +97,8 @@ const statusTxt = ref('Ready')
 const state = ref('idle')
 const error = ref('')
 const numPop = ref(false)
+const typedLabel = ref('Press start to begin')
+const typing = ref(false)
 const results = ref({ download: '—', upload: '—', ping: '—', jitter: '—' })
 
 const phaseColor = computed(() => COLORS[state.value] || COLORS.idle)
@@ -118,19 +109,41 @@ const display = computed(() => {
     return liveSpeed.value > 0 ? liveSpeed.value.toFixed(1) : '…'
 })
 const displayUnit = computed(() => currentPhase.value === 'ping' ? 'ms' : 'Mbps')
-const displayLabel = computed(() => ({
-    idle: 'Press start to begin', ping: 'Measuring latency',
-    download: 'Download speed', upload: 'Upload speed', complete: 'Download result',
-}[state.value] || ''))
 const btnLabel = computed(() =>
     busy.value ? 'Testing…' : state.value === 'complete' ? 'Run again' : 'Start test'
 )
 
+// ── Typewriter ────────────────────────────────────────────────────────────────
+async function typewrite(text) {
+    typing.value = true
+    typedLabel.value = ''
+    for (const ch of text) {
+        typedLabel.value += ch
+        await sleep(36)
+    }
+    typing.value = false
+}
+
+// ── Card flip ─────────────────────────────────────────────────────────────────
+async function flipCard(key, value) {
+    const card = metricCards.find(c => c.key === key)
+    if (!card) return
+    card.flipping = true
+    // At halfway point of flip, swap the value in
+    await sleep(250)
+    results.value[key] = value
+    card.revealed = true
+    await sleep(260)
+    card.flipping = false
+}
+
+// ── Number pop ────────────────────────────────────────────────────────────────
 function triggerPop() {
     numPop.value = false
     nextTick(() => { numPop.value = true; setTimeout(() => { numPop.value = false }, 260) })
 }
 
+// ── Main runner ───────────────────────────────────────────────────────────────
 async function run() {
     if (busy.value) return
     busy.value = true
@@ -140,43 +153,52 @@ async function run() {
     liveSpeed.value = 0
     barPct.value = 0
     results.value = { download: '—', upload: '—', ping: '—', jitter: '—' }
+    metricCards.forEach(c => { c.flipping = false; c.revealed = false })
 
     try {
+        // Ping
         setPhase('ping')
+        await typewrite('Measuring latency…')
         const { ping, jitter } = await measurePing()
-        results.value.ping = ping
-        results.value.jitter = jitter
         liveSpeed.value = ping
         barPct.value = Math.min(Math.max(100 - ping, 0), 100)
         triggerPop()
+        await Promise.all([flipCard('ping', ping), flipCard('jitter', jitter)])
         markDone('ping')
         await sleep(300)
 
+        // Download
         setPhase('download')
+        await typewrite('Download speed')
         liveSpeed.value = 0; barPct.value = 0
         const dl = await measureDownload()
-        results.value.download = dl.toFixed(1)
         triggerPop()
+        await flipCard('download', dl.toFixed(1))
         markDone('download')
         await sleep(300)
 
+        // Upload
         setPhase('upload')
+        await typewrite('Upload speed')
         liveSpeed.value = 0; barPct.value = 0
         const ul = await measureUpload()
-        results.value.upload = ul.toFixed(1)
         triggerPop()
+        await flipCard('upload', ul.toFixed(1))
         markDone('upload')
 
+        // Done
         state.value = 'complete'
         currentPhase.value = ''
         liveSpeed.value = dl
         barPct.value = Math.min((dl / 1000) * 100, 100)
         statusTxt.value = 'Done'
+        await typewrite('Test complete')
 
     } catch (e) {
         error.value = 'Test failed — check your connection and try again.'
         state.value = 'idle'
         statusTxt.value = 'Error'
+        await typewrite('Something went wrong')
     }
 
     busy.value = false
@@ -191,6 +213,7 @@ function markDone(id) {
     if (!donePhases.value.includes(id)) donePhases.value.push(id)
 }
 
+// ── Real measurements ─────────────────────────────────────────────────────────
 async function measurePing() {
     const t = []
     for (let i = 0; i < 8; i++) {
@@ -280,15 +303,35 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
     }
 }
 
-@keyframes fadeUp {
-    from {
-        opacity: 0;
-        transform: translateY(6px)
+@keyframes blink {
+
+    0%,
+    100% {
+        opacity: 1
     }
 
-    to {
-        opacity: 1;
-        transform: none
+    50% {
+        opacity: 0
+    }
+}
+
+@keyframes flipOut {
+    0% {
+        transform: rotateY(0)
+    }
+
+    100% {
+        transform: rotateY(90deg)
+    }
+}
+
+@keyframes flipIn {
+    0% {
+        transform: rotateY(-90deg)
+    }
+
+    100% {
+        transform: rotateY(0)
     }
 }
 
@@ -316,7 +359,6 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
     font-weight: 700;
     letter-spacing: .1em;
     text-transform: uppercase;
-    color: #fff;
 }
 
 .status {
@@ -368,14 +410,26 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
     font-size: 15px;
     color: #333;
     letter-spacing: .06em;
-    font-weight: 500;
 }
 
 .big-label {
-    font-size: 11px;
-    margin-top: 10px;
+    font-size: 12px;
+    margin-top: 12px;
     letter-spacing: .04em;
+    min-height: 18px;
     transition: color .5s;
+}
+
+.cursor {
+    display: inline-block;
+    margin-left: 1px;
+    opacity: 0;
+    font-weight: 300;
+}
+
+.cursor.blink {
+    opacity: 1;
+    animation: blink .7s step-end infinite;
 }
 
 .bar-wrap {
@@ -395,7 +449,6 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
     width: 0%;
     border-radius: 3px;
     transition: width .12s linear, background .5s;
-    position: relative;
 }
 
 .bar-glow {
@@ -511,25 +564,29 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
     letter-spacing: .03em;
 }
 
+/* Card flip grid */
 .metrics {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1px;
-    background: #111;
-    border-radius: 14px;
-    overflow: hidden;
+    gap: 8px;
     margin-top: auto;
 }
 
-.m {
-    background: #0c0c0f;
-    padding: 16px 14px;
-    transition: background .35s;
+.flip-wrap {
+    perspective: 500px;
 }
 
-.m.lit {
+.flip-card {
     background: #0f0f14;
-    animation: fadeUp .35s ease both;
+    border: 1px solid #111;
+    border-radius: 12px;
+    padding: 16px 14px;
+    transform-style: preserve-3d;
+}
+
+/* Two-phase flip: out then in */
+.flip-card.flipping {
+    animation: flipOut .26s ease forwards, flipIn .26s ease .26s forwards;
 }
 
 .m-lbl {
@@ -544,7 +601,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms))
     font-size: 21px;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
-    transition: color .5s;
+    transition: color .3s;
 }
 
 .m-unit {
