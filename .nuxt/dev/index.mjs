@@ -1,5 +1,5 @@
 import process from 'node:process';globalThis._importMeta_={url:import.meta.url,env:process.env};import { tmpdir } from 'node:os';
-import { defineEventHandler, handleCacheHeaders, splitCookiesString, createEvent, fetchWithEvent, isEvent, eventHandler, setHeaders, sendRedirect, proxyRequest, getRequestHeader, setResponseHeaders, setResponseStatus, send, getRequestHeaders, setResponseHeader, appendResponseHeader, getRequestURL, getResponseHeader, removeResponseHeader, createError, getQuery as getQuery$1, readBody, createApp, createRouter as createRouter$1, toNodeListener, lazyEventHandler, getResponseStatus, getRouterParam, getResponseStatusText } from 'file:///home/ousachea/nuxt/node_modules/.pnpm/h3@1.15.6/node_modules/h3/dist/index.mjs';
+import { defineEventHandler, handleCacheHeaders, splitCookiesString, createEvent, fetchWithEvent, isEvent, eventHandler, setHeaders, sendRedirect, proxyRequest, getRequestHeader, setResponseHeaders, setResponseStatus, send, getRequestHeaders, setResponseHeader, appendResponseHeader, getRequestURL, getResponseHeader, removeResponseHeader, createError, getQuery as getQuery$1, readBody, createApp, createRouter as createRouter$1, toNodeListener, lazyEventHandler, getResponseStatus, getRouterParam, setHeader, getResponseStatusText } from 'file:///home/ousachea/nuxt/node_modules/.pnpm/h3@1.15.6/node_modules/h3/dist/index.mjs';
 import { Server } from 'node:http';
 import { resolve, dirname, join } from 'node:path';
 import nodeCrypto from 'node:crypto';
@@ -2118,7 +2118,22 @@ const plugins = [
 _wH6JrtIxmaSoA8lCPWFnE9z4lQeXW6H5z3l5aymEQw
 ];
 
-const assets = {};
+const assets = {
+  "/index.mjs": {
+    "type": "text/javascript; charset=utf-8",
+    "etag": "\"1ad3f-lyGIWmqBttD656gPrl582ZhVKEw\"",
+    "mtime": "2026-04-17T04:58:07.980Z",
+    "size": 109887,
+    "path": "index.mjs"
+  },
+  "/index.mjs.map": {
+    "type": "application/json",
+    "etag": "\"6c214-HR5G3krPlF+FJAp2WiOq8p7zuCQ\"",
+    "mtime": "2026-04-17T04:58:07.980Z",
+    "size": 442900,
+    "path": "index.mjs.map"
+  }
+};
 
 function readAsset (id) {
   const serverDir = dirname$1(fileURLToPath(globalThis._importMeta_.url));
@@ -2578,10 +2593,16 @@ async function getIslandContext(event) {
 	};
 }
 
+const _lazy_ZZpsHN = () => Promise.resolve().then(function () { return downloadTest_get$1; });
+const _lazy_IrOgRa = () => Promise.resolve().then(function () { return ping_get$1; });
+const _lazy_8huWrE = () => Promise.resolve().then(function () { return uploadTest_post$1; });
 const _lazy_ZZf_xQ = () => Promise.resolve().then(function () { return renderer; });
 
 const handlers = [
   { route: '', handler: _j6OP03, lazy: false, middleware: true, method: undefined },
+  { route: '/api/download-test', handler: _lazy_ZZpsHN, lazy: true, middleware: false, method: "get" },
+  { route: '/api/ping', handler: _lazy_IrOgRa, lazy: true, middleware: false, method: "get" },
+  { route: '/api/upload-test', handler: _lazy_8huWrE, lazy: true, middleware: false, method: "post" },
   { route: '/__nuxt_error', handler: _lazy_ZZf_xQ, lazy: true, middleware: false, method: undefined },
   { route: '/__nuxt_island/**', handler: handler$1, lazy: false, middleware: false, method: undefined },
   { route: '/**', handler: _lazy_ZZf_xQ, lazy: true, middleware: false, method: undefined }
@@ -2929,6 +2950,100 @@ const styles = {};
 const styles$1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   default: styles
+}, Symbol.toStringTag, { value: 'Module' }));
+
+const PAYLOAD_SIZE = 20 * 1024 * 1024;
+const CHUNK_SIZE = 64 * 1024;
+const downloadTest_get = defineEventHandler(async (event) => {
+  setHeader(event, "Content-Type", "application/octet-stream");
+  setHeader(event, "Content-Length", PAYLOAD_SIZE.toString());
+  setHeader(event, "Cache-Control", "no-store, no-cache");
+  setHeader(event, "Access-Control-Allow-Origin", "*");
+  const stream = new ReadableStream({
+    start(controller) {
+      let sent = 0;
+      function push() {
+        while (sent < PAYLOAD_SIZE) {
+          const remaining = PAYLOAD_SIZE - sent;
+          const size = Math.min(CHUNK_SIZE, remaining);
+          const chunk = Buffer.alloc(size);
+          controller.enqueue(chunk);
+          sent += size;
+        }
+        controller.close();
+      }
+      push();
+    }
+  });
+  return sendStream(event, stream);
+});
+function sendStream(event, stream) {
+  const res = event.node.res;
+  res.writeHead(200, {
+    "Content-Type": "application/octet-stream",
+    "Content-Length": PAYLOAD_SIZE,
+    "Cache-Control": "no-store"
+  });
+  const reader = stream.getReader();
+  return new Promise((resolve, reject) => {
+    function pump() {
+      reader.read().then(({ done, value }) => {
+        if (done) {
+          res.end();
+          return resolve();
+        }
+        res.write(Buffer.from(value), (err) => {
+          if (err) return reject(err);
+          pump();
+        });
+      }).catch(reject);
+    }
+    pump();
+  });
+}
+
+const downloadTest_get$1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  default: downloadTest_get
+}, Symbol.toStringTag, { value: 'Module' }));
+
+const ping_get = defineEventHandler((event) => {
+  setHeader(event, "Cache-Control", "no-store, no-cache");
+  setHeader(event, "Access-Control-Allow-Origin", "*");
+  return { ok: true, ts: Date.now() };
+});
+
+const ping_get$1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  default: ping_get
+}, Symbol.toStringTag, { value: 'Module' }));
+
+const uploadTest_post = defineEventHandler(async (event) => {
+  setHeader(event, "Cache-Control", "no-store, no-cache");
+  setHeader(event, "Access-Control-Allow-Origin", "*");
+  const start = Date.now();
+  const req = event.node.req;
+  let received = 0;
+  await new Promise((resolve, reject) => {
+    req.on("data", (chunk) => {
+      received += chunk.length;
+    });
+    req.on("end", resolve);
+    req.on("error", reject);
+  });
+  const elapsed = Date.now() - start;
+  return {
+    received,
+    // bytes
+    elapsed,
+    // ms
+    mbps: received > 0 && elapsed > 0 ? +(received * 8 / 1e6 / (elapsed / 1e3)).toFixed(2) : 0
+  };
+});
+
+const uploadTest_post$1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  default: uploadTest_post
 }, Symbol.toStringTag, { value: 'Module' }));
 
 function renderPayloadResponse(ssrContext) {
