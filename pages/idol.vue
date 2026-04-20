@@ -719,9 +719,14 @@ function useCodeParser() {
     'abw': '118',
     'chn': '118',
     'bgn': '118',
+    'docd': '118',
+    'fns': '1',
+    'fsdss': '1',
     'start': '1',
     'dldss': '1',
     'hodv': '41',
+    'nmsl': 'h_1814',
+    'dsvr': '13',
   }
   function parseCode(code) {
     if (!code) return null

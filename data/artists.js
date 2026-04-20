@@ -117,7 +117,7 @@ export const DEFAULT_ARTISTS = [
     mainWorks: ['SOE-823', 'HND-128', 'MIDE-213', 'WANZ-265', 'PPPD-288', 'MIDE-095', 'WANZ-062', 'SOE-636']
   },
   {
-    name: 'Goddess Jun',
+    name: 'Jun Megami 女神ジュン',
     cover: '',
     url: '',  // Custom cover
     compilations: [''],
@@ -360,7 +360,7 @@ export const DEFAULT_ARTISTS = [
   {
     name: 'Koibuchi Momona', cover: 'START-165',
     url: '',  // Custom cover
-    compilations: [''], mainWorks: ['STARS-712', 'START-042', 'START-165', 'START-231', 'START-136', 'START-384', 'START-501', 'START-288', 'START-254']
+    compilations: [''], mainWorks: ['STARS-712', 'DSVR-01875','START-042', 'START-165', 'START-231', 'START-136', 'START-501', 'START-288','DSVR-0174-0','START-524','START-384','START-484','START-254']
   },
   {
     name: 'Ena Koume', cover: 'JUFE-131',
@@ -462,9 +462,9 @@ export const DEFAULT_ARTISTS = [
     mainWorks: ['AVSA-185', 'VENX-093', 'VRKM-293', 'VEC-472', 'KTB-112', 'JFB-503', 'VENX-016', 'MTAFB-002', 'FPRE-139', 'MTALL-126', 'MTALL-115', 'JUFE-434', 'AJVR-171', 'MTALL-025', 'MTALL-020', 'VENX-100', 'NIMA-062', 'MTAFB-001', 'FPRE-176', 'REBD-01-011', 'JUY-858', 'OFES-009', 'SSNI-110', 'FPRE-197', 'CRVR-187', 'DVMM-381', 'KTB-112', 'SAVR-01-01-0', 'SOAV-134']
   },
   {
-    name: 'Rei Kamiki', cover: '',
+    name: 'Rei Kamiki', cover: 'START-542',
     url: 'https://pics.dmm.co.jp/mono/movie/adult/1start070/1start070pl.jpg',  // Custom cover
-    compilations: [''], mainWorks: ['START-070', 'START-398', 'STARS-734', 'STARS-979', 'START-542','REBDB-686', 'STARS-573', 'STARS-778', 'START-488', 'START-508', 'START-306']
+    compilations: [''], mainWorks: ['START-070', 'START-398', 'START-734', 'START-979', 'START-542','REBDB-686', 'START-573', 'START-778', 'START-488', 'START-508', 'START-306']
   },
   {
     name: 'Ren Gojou', cover: '',
