@@ -12,6 +12,27 @@ export const DEFAULT_ARTISTS = [
     mainWorks: ['___',]
   },
   {
+    name: 'Unpai うんぱい',
+    cover: '',
+    url: '',  // Custom cover
+    compilations: [''],
+    mainWorks: ['MIDA-362','SONE-156','SSIS-842','SONE-203']
+  },
+  {
+    name: 'Yua Mikami 三上悠亜',
+    cover: '',
+    url: '',  // Custom cover
+    compilations: [''],
+    mainWorks: ['SSIS-777','SSIS-604','SSNI-566','SSNI-388','SSNI-452']
+  },
+  {
+    name: 'Konan Koyoi 小宵こなん',
+    cover: '',
+    url: '',  // Custom cover
+    compilations: [''],
+    mainWorks: ['SONE-312','SONE-229','SONE-267','SONE-201','SIVR-336','SONE-028','SIVR-315','SSIS-886','SIVR-244','SSIS-587','SIVR-252','SIVR-228','SSIS-414','SSIS-253','SSIS-388','SSIS-157']
+  },
+  {
     name: 'Nami Hoshino 星野ナミ',
     cover: 'SSNI-078',
     url: '',  // Custom cover
@@ -432,7 +453,7 @@ export const DEFAULT_ARTISTS = [
   {
     name: 'Moa Maeda', cover: '',
     url: '',  // Custom cover
-    compilations: [''], mainWorks: ['ADN-334', 'HND-991', 'JUFE-300', 'MIMK-091', 'MSFH-010', 'MSFH-014', 'MSFH-018', 'MSFH-024', 'MSFH-030', 'MSFH-034', 'PPPD-926', 'WAAA-065']
+    compilations: [''], mainWorks: ['ADN-334','HNVR-074','PPVR-014','3DSVR-0746','3DSVR-0711', 'HND-991', 'JUFE-300', 'MIMK-091', 'MSFH-010', 'MSFH-014', 'MSFH-018', 'MSFH-024', 'MSFH-030', 'MSFH-034', 'PPPD-926', 'WAAA-065']
   },
   {
     name: 'Momoka Nishina',

@@ -720,13 +720,19 @@ function useCodeParser() {
     'chn': '118',
     'bgn': '118',
     'docd': '118',
+    'ges': '118',
     'fns': '1',
     'fsdss': '1',
+    'msfh': '1',
+    '3dsvr': '1',
     'start': '1',
     'dldss': '1',
+    'ecb': '2',
     'hodv': '41',
     'nmsl': 'h_1814',
     'dsvr': '13',
+    'bsy': '13',
+    'mille': '436',
   }
   function parseCode(code) {
     if (!code) return null
