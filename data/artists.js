@@ -464,7 +464,7 @@ export const DEFAULT_ARTISTS = [
   {
     name: 'Rei Kamiki', cover: '',
     url: 'https://pics.dmm.co.jp/mono/movie/adult/1start070/1start070pl.jpg',  // Custom cover
-    compilations: [''], mainWorks: ['START-070', 'START-398', 'STARS-734', 'STARS-979', 'REBDB-686', 'STARS-573', 'STARS-778', 'START-488', 'START-508', 'START-306']
+    compilations: [''], mainWorks: ['START-070', 'START-398', 'STARS-734', 'STARS-979', 'START-542','REBDB-686', 'STARS-573', 'STARS-778', 'START-488', 'START-508', 'START-306']
   },
   {
     name: 'Ren Gojou', cover: '',
