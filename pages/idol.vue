@@ -117,6 +117,7 @@
               <button @click="triggerImport">Import data</button>
               <button @click="clearViewHistory">Clear history</button>
               <button @click="hardRefresh" class="menu-danger">Reset all</button>
+              <button @click="openEditor">Edit Logic</button> <button @click="openAddArtistModal">Add artist</button>
             </div>
           </Transition>
         </div>
@@ -387,7 +388,22 @@
           </div>
         </div>
       </main>
+      <main v-else-if="currentView === 'editor'" key="editor" class="page">
+        <div class="editor-view">
+          <div class="editor-header">
+            <div class="editor-info">
+              <h3>{{ targetScript }}</h3>
+              <span class="hint">Firestore Storage</span>
+            </div>
+            <button @click="saveScript" :disabled="isSavingScript" class="btn-add">
+              {{ isSavingScript ? '...' : 'Save Changes' }}
+            </button>
+          </div>
 
+          <textarea v-model="scriptCode" class="mono-editor" spellcheck="false"
+            placeholder="// Enter your JS code..."></textarea>
+        </div>
+      </main>
     </Transition>
 
     <!-- Add Work Modal -->
@@ -1374,7 +1390,46 @@ function selectArtist(name) {
   gridGeneration.value++
   nextTick(() => window.scrollTo({ top: 0, behavior: 'instant' }))
 }
+// 1. New Imports (Add to your existing Firebase imports)
+import { doc, getDoc, setDoc } from 'firebase/firestore'
 
+// 2. New State (Place near 'currentView' ref)
+const scriptCode = ref("// Loading script...")
+const isSavingScript = ref(false)
+const targetScript = "artist-logic.js"
+
+// 3. Navigation & Fetch (Place near 'goBack' function)
+const openEditor = async () => {
+  currentView.value = 'editor'
+  const { $db } = useNuxtApp()
+  const docRef = doc($db, 'scripts', targetScript)
+  const docSnap = await getDoc(docRef)
+
+  if (docSnap.exists()) {
+    scriptCode.value = docSnap.data().code
+  } else {
+    scriptCode.value = "// Start typing your JS logic here..."
+  }
+}
+
+// 4. Save Logic
+const saveScript = async () => {
+  const { $db } = useNuxtApp()
+  isSavingScript.value = true
+  try {
+    const docRef = doc($db, 'scripts', targetScript)
+    await setDoc(docRef, {
+      code: scriptCode.value,
+      updatedAt: new Date()
+    }, { merge: true })
+    toast.value = { show: true, message: 'Script saved!', type: 'success' }
+    setTimeout(() => toast.value.show = false, 2000)
+  } catch (e) {
+    console.error("Save error:", e)
+  } finally {
+    isSavingScript.value = false
+  }
+}
 // FIX 8: set pending restore key; @after-leave on <Transition> triggers the actual scroll
 function backToArtists() {
   viewTransition.value = 'slide-left'
@@ -4640,5 +4695,43 @@ body {
     transform-origin: var(--lb-origin-x, 50%) var(--lb-origin-y, 50%);
     transform: scale(1);
   }
+}
+
+.editor-view {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px);
+  gap: 15px;
+}
+
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.editor-info h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.mono-editor {
+  flex: 1;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 20px;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+  tab-size: 2;
+}
+
+.mono-editor:focus {
+  border-color: var(--warm);
 }
 </style>
