@@ -12,6 +12,13 @@ export const DEFAULT_ARTISTS = [
     mainWorks: ['___',]
   },
   {
+    name: 'Nao Satsuki 彩月七緒',
+    cover: '',
+    url: '',  // Custom cover
+    compilations: [''],
+    mainWorks: ['HMN-849','JUFE-622','JUR-753','START-404']
+  },
+  {
     name: 'Unpai うんぱい',
     cover: '',
     url: '',  // Custom cover
@@ -311,7 +318,7 @@ export const DEFAULT_ARTISTS = [
   {
     name: 'Collection', cover: '',
     url: '',  // Custom cover
-    compilations: [''], mainWorks: ['326FCT-197', '300MIUM-546', '300MIUM-574', '300MIUM-609', '300MIUM-1222', '300MIUM-1210', '300MIUM-1211', '300MIUM-1317', '300MIUM-1202', '300MIUM-786', '300MIUM-1219', '300MIUM-810', '300MIUM-1001', '300MIUM-1141', '300MIUM-801', '300MIUM-778', '300MIUM-783', '300MIUM-811', '300MIUM-908', '300MIUM-886', 'SSIS-658', 'JUFD-948', 'MMKZ-162', 'HTHD-229', 'SGK-117', 'EVA-178', 'GANA-3003', 'SIRO-5232', 'ORECO-907', 'MAAN-1022', 'NTK-825', 'DANDY-923', 'EBOD-911', 'sone-306', 'DOCD-008', '300MAAN-546', '300MIUM-527', 'ADN-630', 'ARA-412', 'CLUB-855', 'DDHP-044', 'FC2-PPV-2864495', 'GANA-2858', 'JUFE-028', 'JUL-872', 'KTB-018', 'MIUM-681', 'MIUM-742', 'MIUM-811', 'NTK-391', 'ORECS-132', 'SSNI-362', 'SUKE-043', 'SUKE-053', 'TOUKA-01',]
+    compilations: [''], mainWorks: ['326FCT-197', '812MMC-025','300MIUM-546', '300MIUM-574', '300MIUM-609', '300MIUM-1222', '300MIUM-1210', '300MIUM-1211', '300MIUM-1317', '300MIUM-1202', '300MIUM-786', '300MIUM-1219', '300MIUM-810', '300MIUM-1001', '300MIUM-1141', '300MIUM-801', '300MIUM-778', '300MIUM-783', '300MIUM-811', '300MIUM-908', '300MIUM-886', 'SSIS-658', 'JUFD-948', 'MMKZ-162', 'HTHD-229', 'SGK-117', 'EVA-178', 'GANA-3003', 'SIRO-5232', 'ORECO-907', 'MAAN-1022', 'NTK-825', 'DANDY-923', 'EBOD-911', 'sone-306', 'DOCD-008', '300MAAN-546', '300MIUM-527', 'ADN-630', 'ARA-412', 'CLUB-855', 'DDHP-044', 'FC2-PPV-2864495', 'GANA-2858', 'JUFE-028', 'JUL-872', 'KTB-018', 'MIUM-681', 'MIUM-742', 'MIUM-811', 'NTK-391', 'ORECS-132', 'SSNI-362', 'SUKE-043', 'SUKE-053', 'TOUKA-01',]
   },
   {
     name: 'Ema Yuina', cover: '',
@@ -530,7 +537,7 @@ export const DEFAULT_ARTISTS = [
   {
     name: 'Satomi Mioka', cover: 'APNS-293',
     url: '',  // Custom cover
-    compilations: ['NAGST-017'], mainWorks: ['HMT-018', 'HAWA-287', 'GERK-350', 'GANA-2705', 'FLC-004', 'JAC-175', 'ION-162', '230ORECO-189', '300MIUM-865', '300MIUM-908', '483DAM-016', 'APNS-293', 'HAWA-325', 'HUNTB-733', 'MAAN-955', 'RECS-283', 'SAN-406', 'BARE-009', 'SRTD-349', 'SRTD-345', 'SPAY-241', 'SIRO-4820', 'ZOZO-165', 'APAA-387', 'GVH-477', 'MRPA-006', 'PKPD-217', 'UZU-004', 'SUN-071', 'MIUM-862', 'NHMSG-031', 'ORECO-079', 'MAAN-982', 'MAAN-836', 'BDST-027', 'AKDL-247', 'AKDL-213', 'AKDL-193', 'DFDM-041']
+    compilations: ['NAGST-017'], mainWorks: ['348NTR-042','HMT-018', 'HAWA-287', 'GERK-350', 'GANA-2705', 'FLC-004', 'JAC-175', 'ION-162', '230ORECO-189', '300MIUM-865', '300MIUM-908', '483DAM-016', 'APNS-293', 'HAWA-325', 'HUNTB-733', 'MAAN-955', 'RECS-283', 'SAN-406', 'BARE-009', 'SRTD-349', 'SRTD-345', 'SPAY-241', 'SIRO-4820', 'ZOZO-165', 'APAA-387', 'GVH-477', 'MRPA-006', 'PKPD-217', 'UZU-004', 'SUN-071', 'MIUM-862', 'NHMSG-031', 'ORECO-079', 'MAAN-982', 'MAAN-836', 'BDST-027', 'AKDL-247', 'AKDL-213', 'AKDL-193', 'DFDM-041']
   },
   {
     name: 'Sena Hikari', cover: '',
