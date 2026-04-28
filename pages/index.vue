@@ -1,5 +1,25 @@
 <template>
   <div class="app" :class="{ dark: isDark }">
+    <!-- Screensaver -->
+    <transition name="ss-fade">
+      <div v-if="screensaver" class="screensaver" @click="exitScreensaver" @keydown.esc="exitScreensaver">
+        <div class="ss-content">
+          <div class="ss-gem">◈</div>
+          <div class="ss-price">
+            <span class="ss-dollar">$</span>
+            <span class="ss-int">{{ animatedPrice ? Math.floor(animatedPrice).toLocaleString() : '——' }}</span>
+            <span v-if="goldPrice" class="ss-dec">.{{ (goldPrice % 1).toFixed(2).slice(2) }}</span>
+          </div>
+          <div class="ss-unit">/ troy oz · XAU</div>
+          <div class="ss-divider"></div>
+          <div class="ss-chi">${{ (pricePerGram * CHI).toFixed(2) }} <span>/ Chi</span></div>
+          <div class="ss-damlung">${{ (pricePerGram * DAMLUNG).toFixed(2) }} <span>/ Damlung</span></div>
+          <div class="ss-time">{{ ssTime }}</div>
+          <div class="ss-hint">Tap anywhere to exit</div>
+        </div>
+      </div>
+    </transition>
+
     <!-- Ambient Background -->
     <div class="ambient" aria-hidden="true">
       <div class="orb orb-1" />
@@ -38,11 +58,11 @@
       <span class="sticky-gem">◈</span>
       <div class="sticky-prices">
         <div class="sticky-row-main">
-          <span class="sticky-val">${{ displayPrice?.toFixed(2) ?? '——' }}</span>
+          <span class="sticky-val">${{ renderedPrice?.toFixed(2) ?? '——' }}</span>
           <span class="sticky-unit">/ troy oz</span>
         </div>
         <div class="sticky-row-sub" v-if="displayPrice">
-          <span class="sticky-val-sub">${{ (displayPrice / 31.1035 * 37.5).toFixed(2) }}</span>
+          <span class="sticky-val-sub">${{ (renderedPrice / 31.1035 * 37.5).toFixed(2) }}</span>
           <span class="sticky-unit-sub">/ damlung</span>
         </div>
       </div>
@@ -236,8 +256,14 @@
               </div>
             </div>
             <div v-else class="empty-state">
-              <span class="empty-icon">◈</span>
+              <svg class="empty-svg" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="40" cy="40" r="28" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.3"/>
+                <circle cx="40" cy="40" r="20" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>
+                <text x="40" y="45" text-anchor="middle" font-size="18" fill="currentColor" opacity="0.6" font-family="serif">$</text>
+                <circle cx="40" cy="40" r="28" stroke="currentColor" stroke-width="0.5" opacity="0.15"/>
+              </svg>
               <p>{{ t.fetchPriceFirst }}</p>
+              <button class="ghost-btn" style="font-size:12px;padding:8px 16px;" @click="fetchPrice">↻ Fetch price</button>
             </div>
           </section>
 
@@ -306,6 +332,10 @@
                       <label>{{ t.pricePaid }} (USD)</label>
                       <input v-model.number="draft.price" type="text" inputmode="decimal"
                         :placeholder="t.enterPrice" class="text-input" />
+                      <button v-if="goldPrice && !draft.price" type="button" class="today-chip"
+                        @click="draft.price = parseFloat((pricePerGram * toGrams(draft.weight || 1, draft.unit)).toFixed(2))">
+                        ✦ Use current price
+                      </button>
                     </div>
                     <div class="form-field">
                       <label>{{ t.date }}</label>
@@ -386,7 +416,12 @@
               </div>
 
               <div v-else-if="!showForm" class="empty-state">
-                <span class="empty-icon">◈</span>
+                <svg class="empty-svg" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="20" y="38" width="40" height="24" rx="3" stroke="currentColor" stroke-width="1.5" opacity="0.5"/>
+                  <path d="M28 38V32a12 12 0 0 1 24 0v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+                  <circle cx="40" cy="50" r="4" fill="currentColor" opacity="0.4"/>
+                  <line x1="40" y1="54" x2="40" y2="58" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/>
+                </svg>
                 <p>{{ t.noPurchases }}</p>
               </div>
             </template>
@@ -463,12 +498,12 @@
             <div class="qref-list">
               <div v-for="qty in [1, 2, 5, 10]" :key="qty" class="qref-row">
                 <span class="qref-label">{{ qty }} Chi</span>
-                <span class="qref-val">${{ (pricePerGram * 3.75 * qty).toFixed(2) }}</span>
+                <span class="qref-val">${{ (renderedPPG * 3.75 * qty).toFixed(2) }}</span>
               </div>
               <div class="qref-divider" />
               <div v-for="qty in [1, 2, 5]" :key="'d'+qty" class="qref-row">
                 <span class="qref-label">{{ qty }} Damlung</span>
-                <span class="qref-val">${{ (pricePerGram * 37.5 * qty).toFixed(2) }}</span>
+                <span class="qref-val">${{ (renderedPPG * 37.5 * qty).toFixed(2) }}</span>
               </div>
             </div>
           </section>
@@ -486,7 +521,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TROY = 31.1035
@@ -768,20 +803,20 @@ const pricePerGram = computed(() => displayPrice.value ? displayPrice.value / TR
 // displayPrice: animatedPrice during sim ticks, real goldPrice otherwise
 const displayPrice = computed(() => animatedPrice.value ?? goldPrice.value)
 const priceUnits = computed(() => [
-  { key: 'li',      label: 'Li',      price: pricePerGram.value * LI },
-  { key: 'hun',     label: 'Hun',     price: pricePerGram.value * HUN },
-  { key: 'chi',     label: 'Chi',     price: pricePerGram.value * CHI },
-  { key: 'gram',    label: 'Gram',    price: pricePerGram.value },
-  { key: 'damlung', label: 'Damlung', price: pricePerGram.value * DAMLUNG },
-  { key: 'troyOz',  label: 'Troy Oz', price: displayPrice.value || 0 },
+  { key: 'li',      label: 'Li',      price: renderedPPG.value * LI },
+  { key: 'hun',     label: 'Hun',     price: renderedPPG.value * HUN },
+  { key: 'chi',     label: 'Chi',     price: renderedPPG.value * CHI },
+  { key: 'gram',    label: 'Gram',    price: renderedPPG.value },
+  { key: 'damlung', label: 'Damlung', price: renderedPPG.value * DAMLUNG },
+  { key: 'troyOz',  label: 'Troy Oz', price: renderedPrice.value || 0 },
 ])
 const allUnits = computed(() => [
-  { key: 'li',      label: 'Li',      price: pricePerGram.value * LI,      gram: '0.0375g' },
-  { key: 'hun',     label: 'Hun',     price: pricePerGram.value * HUN,     gram: '0.375g' },
-  { key: 'chi',     label: 'Chi',     price: pricePerGram.value * CHI,     gram: '3.75g' },
-  { key: 'gram',    label: 'Gram',    price: pricePerGram.value,            gram: '1g' },
-  { key: 'damlung', label: 'Damlung', price: pricePerGram.value * DAMLUNG, gram: '37.5g' },
-  { key: 'troyOz',  label: 'Troy Oz', price: displayPrice.value || 0,      gram: '31.1g' },
+  { key: 'li',      label: 'Li',      price: renderedPPG.value * LI,      gram: '0.0375g' },
+  { key: 'hun',     label: 'Hun',     price: renderedPPG.value * HUN,     gram: '0.375g' },
+  { key: 'chi',     label: 'Chi',     price: renderedPPG.value * CHI,     gram: '3.75g' },
+  { key: 'gram',    label: 'Gram',    price: renderedPPG.value,            gram: '1g' },
+  { key: 'damlung', label: 'Damlung', price: renderedPPG.value * DAMLUNG, gram: '37.5g' },
+  { key: 'troyOz',  label: 'Troy Oz', price: renderedPrice.value || 0,    gram: '31.1g' },
 ])
 
 // Converter USD value + scaled price grid
@@ -1005,7 +1040,69 @@ function importCSV(e) {
   reader.readAsText(file); e.target.value = ''
 }
 
-// ─── Persistence ──────────────────────────────────────────────────────────────
+// ─── Screensaver ──────────────────────────────────────────────────────────────
+const screensaver = ref(false)
+const ssTime = ref('')
+let idleTimer = null
+const IDLE_MS = 60000
+
+function resetIdle() {
+  if (screensaver.value) return
+  clearTimeout(idleTimer)
+  idleTimer = setTimeout(() => { if (goldPrice.value) screensaver.value = true }, IDLE_MS)
+}
+
+function exitScreensaver() { screensaver.value = false; resetIdle() }
+
+function startIdleWatch() {
+  ;['mousemove','mousedown','keydown','touchstart','scroll'].forEach(e =>
+    window.addEventListener(e, resetIdle, { passive: true })
+  )
+  resetIdle()
+}
+
+function stopIdleWatch() {
+  clearTimeout(idleTimer)
+  ;['mousemove','mousedown','keydown','touchstart','scroll'].forEach(e =>
+    window.removeEventListener(e, resetIdle)
+  )
+}
+
+watch(screensaver, v => { v ? startSSClock() : stopSSClock() })
+
+// screensaver clock
+let ssClockTimer = null
+function startSSClock() {
+  function tick() { ssTime.value = new Date().toLocaleTimeString(); ssClockTimer = setTimeout(tick, 1000) }
+  tick()
+}
+function stopSSClock() { clearTimeout(ssClockTimer) }
+
+// ─── Smooth per-unit prices (chips, tiles, qref, sticky) ─────────────────────
+// We run a single shared rAF loop that tracks displayPrice and smoothly
+// interpolates a "renderedPrice" which all secondary displays read from.
+const renderedPrice = ref(null)
+let renderRafId = null
+let renderTarget = null
+
+function startPriceRenderLoop() {
+  function loop() {
+    const target = displayPrice.value
+    if (target == null) { renderRafId = requestAnimationFrame(loop); return }
+    if (renderedPrice.value == null) { renderedPrice.value = target }
+    const diff = target - renderedPrice.value
+    if (Math.abs(diff) < 0.005) {
+      renderedPrice.value = target
+    } else {
+      renderedPrice.value += diff * 0.12   // smooth follow factor
+    }
+    renderRafId = requestAnimationFrame(loop)
+  }
+  renderRafId = requestAnimationFrame(loop)
+}
+
+// Computed per-gram from renderedPrice so chips/tiles all follow smoothly
+const renderedPPG = computed(() => renderedPrice.value ? renderedPrice.value / TROY : 0)
 function save() {
   try {
     localStorage.setItem('gt4', JSON.stringify({
@@ -1046,13 +1143,18 @@ onMounted(() => {
   window.addEventListener('online', handleOnline)
   window.addEventListener('offline', handleOffline)
   window.addEventListener('scroll', handleScroll, { passive: true })
+  startIdleWatch()
+  startPriceRenderLoop()
 })
 onBeforeUnmount(() => {
   window.removeEventListener('online', handleOnline)
   window.removeEventListener('offline', handleOffline)
   window.removeEventListener('scroll', handleScroll)
   stopPriceSim()
+  stopIdleWatch()
+  stopSSClock()
   if (rafId) cancelAnimationFrame(rafId)
+  if (renderRafId) cancelAnimationFrame(renderRafId)
 })
 </script>
 
@@ -1123,6 +1225,37 @@ onBeforeUnmount(() => {
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }
+
+/* ── Empty state SVG ── */
+.empty-svg { width: 64px; height: 64px; color: var(--text-3); }
+
+/* ── Screensaver ── */
+.screensaver {
+  position: fixed; inset: 0; z-index: 999;
+  background: #0A0A10;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.ss-content {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 10px; padding: 40px;
+  animation: ssDrift 8s ease-in-out infinite alternate;
+}
+@keyframes ssDrift { from { transform: translate(0, 0); } to { transform: translate(12px, -16px); } }
+.ss-gem { font-size: 32px; color: #F5C842; animation: gemPulse 4s ease-in-out infinite; margin-bottom: 8px; }
+.ss-price { display: flex; align-items: baseline; gap: 3px; }
+.ss-dollar { font-size: 32px; font-weight: 800; color: #F5C842; align-self: flex-start; margin-top: 6px; }
+.ss-int { font-size: clamp(64px, 14vw, 120px); font-weight: 800; color: #F5C842; letter-spacing: -4px; font-variant-numeric: tabular-nums; font-family: 'DM Mono', monospace; }
+.ss-dec { font-size: 32px; font-weight: 700; color: #C08A10; }
+.ss-unit { font-size: 13px; color: rgba(245,200,66,0.45); letter-spacing: 0.12em; font-family: 'DM Mono', monospace; }
+.ss-divider { width: 60px; height: 1px; background: rgba(245,200,66,0.2); margin: 6px 0; }
+.ss-chi { font-size: 20px; font-weight: 700; color: rgba(245,200,66,0.75); font-family: 'DM Mono', monospace; }
+.ss-chi span, .ss-damlung span { font-size: 12px; font-weight: 500; color: rgba(245,200,66,0.4); margin-left: 4px; }
+.ss-damlung { font-size: 20px; font-weight: 700; color: rgba(245,200,66,0.6); font-family: 'DM Mono', monospace; }
+.ss-time { font-size: 14px; color: rgba(255,255,255,0.2); font-family: 'DM Mono', monospace; margin-top: 16px; }
+.ss-hint { font-size: 11px; color: rgba(255,255,255,0.12); letter-spacing: 0.08em; margin-top: 4px; }
+.ss-fade-enter-active, .ss-fade-leave-active { transition: opacity 0.6s ease; }
+.ss-fade-enter-from, .ss-fade-leave-to { opacity: 0; }
 
 /* ── Ambient ── */
 .ambient {
