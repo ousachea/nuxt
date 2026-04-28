@@ -4,6 +4,7 @@
         <div class="ambient" aria-hidden="true">
             <div class="orb orb-1" />
             <div class="orb orb-2" />
+            <div class="orb orb-3" />
         </div>
 
         <!-- Header -->
@@ -16,11 +17,20 @@
                         <span class="logo-sub">gold portfolio tracker</span>
                     </div>
                 </div>
-                <div class="header-controls">
-                    <button class="ctrl-btn" @click="scrollToPurchases" :aria-label="t.myPurchases"
-                        :title="t.myPurchases">
-                        <span>💰</span>
+                <!-- Desktop nav tabs -->
+                <nav class="desktop-nav">
+                    <button class="nav-tab" :class="{ active: activeTab === 'price' }" @click="activeTab = 'price'">
+                        ⬡ Price
                     </button>
+                    <button class="nav-tab" :class="{ active: activeTab === 'convert' }" @click="activeTab = 'convert'">
+                        ⇄ Convert
+                    </button>
+                    <button class="nav-tab" :class="{ active: activeTab === 'portfolio' }"
+                        @click="activeTab = 'portfolio'">
+                        💰 Portfolio
+                    </button>
+                </nav>
+                <div class="header-controls">
                     <button class="ctrl-btn" @click="toggleDark" :aria-label="isDark ? 'Light mode' : 'Dark mode'">
                         <span>{{ isDark ? '☀' : '◑' }}</span>
                     </button>
@@ -54,312 +64,349 @@
 
         <main class="main">
 
-            <!-- ── PRICE SECTION ── -->
-            <section class="card price-hero">
-                <div class="card-accent" />
+            <!-- ══════════════════════════════════════════════════════ -->
+            <!-- DESKTOP: 3-COLUMN LAYOUT                              -->
+            <!-- ══════════════════════════════════════════════════════ -->
+            <div class="desktop-grid">
 
-                <!-- Source Toggle -->
-                <div class="seg-ctrl">
-                    <button class="seg-btn" :class="{ active: priceSource === 'api' }" @click="priceSource = 'api'">
-                        ⬡ {{ t.live }}
-                    </button>
-                    <button class="seg-btn" :class="{ active: priceSource === 'custom' }"
-                        @click="priceSource = 'custom'">
-                        ✦ {{ t.custom }}
-                    </button>
-                </div>
+                <!-- ── LEFT COLUMN: Price ── -->
+                <div class="col-left">
 
-                <!-- Big Price -->
-                <div class="hero-price-block">
-                    <div class="hero-meta-row">
-                        <span class="metal-tag">🥇 {{ t.gold }}</span>
-                        <span v-if="lastUpdated && priceSource === 'api'" class="last-updated">{{ lastUpdated }}</span>
-                    </div>
-                    <transition name="price-flip" mode="out-in">
-                        <div class="hero-price" :key="goldPrice?.toFixed(0) ?? 'null'">
-                            <span class="price-dollar">$</span>
-                            <span class="price-int">{{ animatedPrice ? Math.floor(animatedPrice).toLocaleString() : '——'
-                                }}</span>
-                            <span v-if="goldPrice" class="price-dec">.{{ (goldPrice % 1).toFixed(2).slice(2) }}</span>
+                    <!-- ── PRICE SECTION ── -->
+                    <section class="card price-hero">
+                        <div class="card-accent" />
+
+                        <!-- Source Toggle -->
+                        <div class="seg-ctrl">
+                            <button class="seg-btn" :class="{ active: priceSource === 'api' }"
+                                @click="priceSource = 'api'">
+                                ⬡ {{ t.live }}
+                            </button>
+                            <button class="seg-btn" :class="{ active: priceSource === 'custom' }"
+                                @click="priceSource = 'custom'">
+                                ✦ {{ t.custom }}
+                            </button>
                         </div>
-                    </transition>
-                    <span class="price-unit-label">{{ t.perTroyOz }}</span>
-                </div>
 
-                <!-- Per-unit chips -->
-                <div v-if="goldPrice" class="chips-scroll" :key="goldPrice">
-                    <div v-for="(u, idx) in priceUnits" :key="u.key" class="chip chip-shimmer"
-                        :style="{ animationDelay: (idx * 0.08) + 's' }">
-                        <div class="shimmer-line"></div>
-                        <span class="chip-label">{{ t[u.key] || u.label }}</span>
-                        <span class="chip-price">${{ u.price < 1 ? u.price.toFixed(4) : u.price.toFixed(2) }}</span>
-                    </div>
-                </div>
-
-                <!-- Loading -->
-                <div v-if="loading" class="progress-bar">
-                    <div class="progress-fill" />
-                </div>
-
-                <!-- Flash -->
-                <transition name="fade">
-                    <div v-if="flashMsg" class="flash" :class="flashType" role="alert">{{ flashMsg }}</div>
-                </transition>
-
-                <!-- API Panel -->
-                <div v-if="priceSource === 'api'" class="sub-panel">
-                    <div class="sub-panel-row">
-                        <div class="api-info">
-                            <span class="api-badge">gold-api.com</span>
-                            <span class="api-hint-text">{{ t.apiHint }}</span>
-                        </div>
-                        <button class="primary-btn refresh-btn" @click="fetchPrice" :disabled="loading">
-                            <span :class="{ 'spin': loading }">↻</span>
-                            {{ loading ? t.loading : t.refresh }}
-                        </button>
-                    </div>
-                    <div class="api-key-row">
-                        <input v-model="customApiUrl" class="text-input" type="text" :placeholder="t.apiKeyPlaceholder"
-                            autocomplete="off" autocorrect="off" spellcheck="false" />
-                        <button class="icon-btn-sm" @click="pasteClipboard" :title="t.paste">📋</button>
-                        <button v-if="customApiUrl" class="icon-btn-sm danger" @click="customApiUrl = ''; save()"
-                            :title="t.clear">✕</button>
-                    </div>
-                    <p class="api-hint">
-                        {{ t.freeNoKey }} ·
-                        <a href="https://www.goldapi.io/" target="_blank" rel="noopener">goldapi.io</a>
-                        {{ t.asBackup }}
-                    </p>
-                </div>
-
-                <!-- Custom Panel -->
-                <div v-if="priceSource === 'custom'" class="sub-panel">
-                    <div class="method-tabs">
-                        <button v-for="m in ['troyOz', 'damlung', 'chi']" :key="m" class="method-btn"
-                            :class="{ active: priceMethod === m }" @click="switchMethod(m)">
-                            {{ m === 'troyOz' ? t.troyOz : t[m] }}
-                        </button>
-                    </div>
-                    <div class="price-input-row">
-                        <span class="input-prefix">$</span>
-                        <input v-model.number="customPrice" class="text-input price-input" type="text"
-                            inputmode="decimal"
-                            :placeholder="t.enterPriceFor + ' ' + (priceMethod === 'troyOz' ? t.troyOz : priceMethod === 'damlung' ? t.damlung : t.chi)"
-                            @input="applyCustomPrice" />
-                    </div>
-                </div>
-            </section>
-
-            <!-- ── CONVERTER ── -->
-            <section class="card">
-                <h2 class="section-title">{{ t.unitConverter }}</h2>
-
-                <div class="conv-tabs-scroll">
-                    <button v-for="u in converterUnits" :key="u" class="conv-tab" :class="{ active: activeConv === u }"
-                        @click="activeConv = u">
-                        {{ t[u] || u }}
-                    </button>
-                </div>
-
-                <div class="conv-input-row">
-                    <div class="from-badge">{{ t[activeConv] }}</div>
-                    <input v-model.number="convInput" class="text-input conv-input" type="text" inputmode="decimal"
-                        :placeholder="'1'" />
-                </div>
-
-                <div class="conv-results">
-                    <div v-for="u in converterUnits.filter(x => x !== activeConv)" :key="u" class="conv-row">
-                        <span class="conv-label">{{ t[u] }}</span>
-                        <span class="conv-val">{{ convertUnit(convInput || 0, activeConv, u) }}</span>
-                    </div>
-                </div>
-            </section>
-
-            <!-- ── PRICE GRID ── -->
-            <section class="card">
-                <h2 class="section-title">{{ t.priceByUnit }}</h2>
-                <div v-if="goldPrice" class="unit-grid">
-                    <div v-for="u in allUnits" :key="u.key" class="unit-tile">
-                        <div class="tile-top">
-                            <span class="tile-name">{{ t[u.key] || u.label }}</span>
-                            <span class="tile-gram">{{ u.gram }}</span>
-                        </div>
-                        <span class="tile-price">${{ u.price < 1 ? u.price.toFixed(4) : u.price.toFixed(2) }}</span>
-                    </div>
-                </div>
-                <div v-else class="empty-state">
-                    <span class="empty-icon">◈</span>
-                    <p>{{ t.fetchPriceFirst }}</p>
-                </div>
-            </section>
-
-            <!-- ── PURCHASES ── -->
-            <section class="card" id="purchases-section" :class="{ 'section-glow': purchasesGlow }">
-                <div class="section-header">
-                    <h2 class="section-title">{{ t.myPurchases }}</h2>
-                    <div class="section-actions">
-                        <template v-if="!purchasesLocked">
-                            <button class="ghost-btn" @click="exportCSV">↓ CSV</button>
-                            <button class="ghost-btn" @click="csvInput.click()">↑ CSV</button>
-                            <button class="ghost-btn lock-btn" @click="lockPurchases" :title="t.lock">🔒</button>
-                        </template>
-                        <input ref="csvInput" type="file" accept=".csv" hidden @change="importCSV" />
-                    </div>
-                </div>
-
-                <!-- ── PASSWORD GATE ── -->
-                <div v-if="purchasesLocked" class="pw-gate">
-                    <div class="pw-box">
-                        <div class="burst-ring-wrap" :class="{ burst: pwUnlockBurst }">
-                            <div class="burst-r1"></div>
-                            <div class="burst-r2"></div>
-                            <div class="pw-icon" :class="{ shake: pwShake }">🔒</div>
-                        </div>
-                        <p class="pw-title">{{ t.locked }}</p>
-                        <p class="pw-sub">{{ t.pwSub }}</p>
-                        <input v-model="pwInput" class="text-input" type="password" :placeholder="t.enterPw"
-                            @keyup.enter="unlockPurchases" autocomplete="current-password" />
-                        <transition name="fade">
-                            <p v-if="pwError" class="pw-error">{{ pwError }}</p>
-                        </transition>
-                        <button class="primary-btn full-btn" @click="unlockPurchases">{{ t.unlock }}</button>
-                    </div>
-                </div>
-
-                <!-- ── PURCHASES CONTENT (unlocked) ── -->
-                <template v-else>
-
-                    <!-- FAB-style Add Button -->
-                    <button class="add-purchase-btn" @click="showForm = !showForm">
-                        <span class="add-icon">{{ showForm ? '✕' : '+' }}</span>
-                        <span>{{ showForm ? t.cancel : t.addPurchase }}</span>
-                    </button>
-
-                    <!-- Add Form -->
-                    <transition name="slide-down">
-                        <div v-if="showForm" class="purchase-form">
-                            <div class="form-grid">
-                                <div class="form-field">
-                                    <label>{{ t.weight }}</label>
-                                    <input v-model.number="draft.weight" type="text" inputmode="decimal"
-                                        :placeholder="t.enterWeight" class="text-input" />
-                                </div>
-                                <div class="form-field">
-                                    <label>{{ t.unit }}</label>
-                                    <select v-model="draft.unit" class="text-input">
-                                        <option v-for="u in converterUnits" :key="u" :value="u">{{ t[u] || u }}</option>
-                                    </select>
-                                </div>
-                                <div class="form-field">
-                                    <label>{{ t.pricePaid }} (USD)</label>
-                                    <input v-model.number="draft.price" type="text" inputmode="decimal"
-                                        :placeholder="t.enterPrice" class="text-input" />
-                                </div>
-                                <div class="form-field">
-                                    <label>{{ t.date }}</label>
-                                    <input v-model="draft.date" type="date" class="text-input" />
-                                </div>
+                        <!-- Big Price -->
+                        <div class="hero-price-block">
+                            <div class="hero-meta-row">
+                                <span class="metal-tag">🥇 {{ t.gold }}</span>
+                                <span v-if="lastUpdated && priceSource === 'api'" class="last-updated">{{ lastUpdated
+                                    }}</span>
                             </div>
-                            <button class="primary-btn full-btn" @click="addPurchase">✦ {{ t.save }}</button>
+                            <transition name="price-flip" mode="out-in">
+                                <div class="hero-price" :key="goldPrice?.toFixed(0) ?? 'null'">
+                                    <span class="price-dollar">$</span>
+                                    <span class="price-int">{{ animatedPrice ?
+        Math.floor(animatedPrice).toLocaleString() : '——' }}</span>
+                                    <span v-if="goldPrice" class="price-dec">.{{ (goldPrice % 1).toFixed(2).slice(2)
+                                        }}</span>
+                                </div>
+                            </transition>
+                            <span class="price-unit-label">{{ t.perTroyOz }}</span>
                         </div>
-                    </transition>
 
-                    <!-- Purchase Cards -->
-                    <div v-if="purchases.length" class="purchases-list">
-                        <div v-for="(p, i) in purchases" :key="p.id" class="p-card p-card-stagger" :style="{
+                        <!-- Per-unit chips -->
+                        <div v-if="goldPrice" class="chips-grid" :key="goldPrice">
+                            <div v-for="(u, idx) in priceUnits" :key="u.key" class="chip chip-shimmer"
+                                :style="{ animationDelay: (idx * 0.08) + 's' }">
+                                <div class="shimmer-line"></div>
+                                <span class="chip-label">{{ t[u.key] || u.label }}</span>
+                                <span class="chip-price">${{ u.price < 1 ? u.price.toFixed(4) : u.price.toFixed(2)
+                                        }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Loading -->
+                        <div v-if="loading" class="progress-bar">
+                            <div class="progress-fill" />
+                        </div>
+
+                        <!-- Flash -->
+                        <transition name="fade">
+                            <div v-if="flashMsg" class="flash" :class="flashType" role="alert">{{ flashMsg }}</div>
+                        </transition>
+
+                        <!-- API Panel -->
+                        <div v-if="priceSource === 'api'" class="sub-panel">
+                            <div class="sub-panel-row">
+                                <div class="api-info">
+                                    <span class="api-badge">gold-api.com</span>
+                                    <span class="api-hint-text">{{ t.apiHint }}</span>
+                                </div>
+                                <button class="primary-btn refresh-btn" @click="fetchPrice" :disabled="loading">
+                                    <span :class="{ 'spin': loading }">↻</span>
+                                    {{ loading ? t.loading : t.refresh }}
+                                </button>
+                            </div>
+                            <div class="api-key-row">
+                                <input v-model="customApiUrl" class="text-input" type="text"
+                                    :placeholder="t.apiKeyPlaceholder" autocomplete="off" autocorrect="off"
+                                    spellcheck="false" />
+                                <button class="icon-btn-sm" @click="pasteClipboard" :title="t.paste">📋</button>
+                                <button v-if="customApiUrl" class="icon-btn-sm danger"
+                                    @click="customApiUrl = ''; save()" :title="t.clear">✕</button>
+                            </div>
+                            <p class="api-hint">
+                                {{ t.freeNoKey }} ·
+                                <a href="https://www.goldapi.io/" target="_blank" rel="noopener">goldapi.io</a>
+                                {{ t.asBackup }}
+                            </p>
+                        </div>
+
+                        <!-- Custom Panel -->
+                        <div v-if="priceSource === 'custom'" class="sub-panel">
+                            <div class="method-tabs">
+                                <button v-for="m in ['troyOz', 'damlung', 'chi']" :key="m" class="method-btn"
+                                    :class="{ active: priceMethod === m }" @click="switchMethod(m)">
+                                    {{ m === 'troyOz' ? t.troyOz : t[m] }}
+                                </button>
+                            </div>
+                            <div class="price-input-row">
+                                <span class="input-prefix">$</span>
+                                <input v-model.number="customPrice" class="text-input price-input" type="text"
+                                    inputmode="decimal"
+                                    :placeholder="t.enterPriceFor + ' ' + (priceMethod === 'troyOz' ? t.troyOz : priceMethod === 'damlung' ? t.damlung : t.chi)"
+                                    @input="applyCustomPrice" />
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- ── CONVERTER ── -->
+                    <section class="card">
+                        <h2 class="section-title">{{ t.unitConverter }}</h2>
+
+                        <div class="conv-tabs-scroll">
+                            <button v-for="u in converterUnits" :key="u" class="conv-tab"
+                                :class="{ active: activeConv === u }" @click="activeConv = u">
+                                {{ t[u] || u }}
+                            </button>
+                        </div>
+
+                        <div class="conv-input-row">
+                            <div class="from-badge">{{ t[activeConv] }}</div>
+                            <input v-model.number="convInput" class="text-input conv-input" type="text"
+                                inputmode="decimal" :placeholder="'1'" />
+                        </div>
+
+                        <div class="conv-results">
+                            <div v-for="u in converterUnits.filter(x => x !== activeConv)" :key="u" class="conv-row">
+                                <span class="conv-label">{{ t[u] }}</span>
+                                <span class="conv-val">{{ convertUnit(convInput || 0, activeConv, u) }}</span>
+                            </div>
+                        </div>
+                    </section>
+
+                </div>
+
+                <!-- ── CENTER COLUMN: Price Grid + Purchases ── -->
+                <div class="col-center">
+
+                    <!-- ── PRICE GRID ── -->
+                    <section class="card">
+                        <h2 class="section-title">{{ t.priceByUnit }}</h2>
+                        <div v-if="goldPrice" class="unit-grid">
+                            <div v-for="u in allUnits" :key="u.key" class="unit-tile">
+                                <div class="tile-top">
+                                    <span class="tile-name">{{ t[u.key] || u.label }}</span>
+                                    <span class="tile-gram">{{ u.gram }}</span>
+                                </div>
+                                <span class="tile-price">${{ u.price < 1 ? u.price.toFixed(4) : u.price.toFixed(2)
+                                        }}</span>
+                            </div>
+                        </div>
+                        <div v-else class="empty-state">
+                            <span class="empty-icon">◈</span>
+                            <p>{{ t.fetchPriceFirst }}</p>
+                        </div>
+                    </section>
+
+                    <!-- ── PURCHASES ── -->
+                    <section class="card" id="purchases-section" :class="{ 'section-glow': purchasesGlow }">
+                        <div class="section-header">
+                            <h2 class="section-title">{{ t.myPurchases }}</h2>
+                            <div class="section-actions">
+                                <template v-if="!purchasesLocked">
+                                    <button class="ghost-btn" @click="exportCSV">↓ CSV</button>
+                                    <button class="ghost-btn" @click="csvInput.click()">↑ CSV</button>
+                                    <button class="ghost-btn lock-btn" @click="lockPurchases"
+                                        :title="t.lock">🔒</button>
+                                </template>
+                                <input ref="csvInput" type="file" accept=".csv" hidden @change="importCSV" />
+                            </div>
+                        </div>
+
+                        <!-- ── PASSWORD GATE ── -->
+                        <div v-if="purchasesLocked" class="pw-gate">
+                            <div class="pw-box">
+                                <div class="burst-ring-wrap" :class="{ burst: pwUnlockBurst }">
+                                    <div class="burst-r1"></div>
+                                    <div class="burst-r2"></div>
+                                    <div class="pw-icon" :class="{ shake: pwShake }">🔒</div>
+                                </div>
+                                <p class="pw-title">{{ t.locked }}</p>
+                                <p class="pw-sub">{{ t.pwSub }}</p>
+                                <input v-model="pwInput" class="text-input" type="password" :placeholder="t.enterPw"
+                                    @keyup.enter="unlockPurchases" autocomplete="current-password" />
+                                <transition name="fade">
+                                    <p v-if="pwError" class="pw-error">{{ pwError }}</p>
+                                </transition>
+                                <button class="primary-btn full-btn" @click="unlockPurchases">{{ t.unlock }}</button>
+                            </div>
+                        </div>
+
+                        <!-- ── PURCHASES CONTENT (unlocked) ── -->
+                        <template v-else>
+                            <!-- FAB-style Add Button -->
+                            <button class="add-purchase-btn" @click="showForm = !showForm">
+                                <span class="add-icon">{{ showForm ? '✕' : '+' }}</span>
+                                <span>{{ showForm ? t.cancel : t.addPurchase }}</span>
+                            </button>
+
+                            <!-- Add Form -->
+                            <transition name="slide-down">
+                                <div v-if="showForm" class="purchase-form">
+                                    <div class="form-grid">
+                                        <div class="form-field">
+                                            <label>{{ t.weight }}</label>
+                                            <input v-model.number="draft.weight" type="text" inputmode="decimal"
+                                                :placeholder="t.enterWeight" class="text-input" />
+                                        </div>
+                                        <div class="form-field">
+                                            <label>{{ t.unit }}</label>
+                                            <select v-model="draft.unit" class="text-input">
+                                                <option v-for="u in converterUnits" :key="u" :value="u">{{ t[u] || u }}
+                                                </option>
+                                            </select>
+                                        </div>
+                                        <div class="form-field">
+                                            <label>{{ t.pricePaid }} (USD)</label>
+                                            <input v-model.number="draft.price" type="text" inputmode="decimal"
+                                                :placeholder="t.enterPrice" class="text-input" />
+                                        </div>
+                                        <div class="form-field">
+                                            <label>{{ t.date }}</label>
+                                            <input v-model="draft.date" type="date" class="text-input" />
+                                        </div>
+                                    </div>
+                                    <button class="primary-btn full-btn" @click="addPurchase">✦ {{ t.save }}</button>
+                                </div>
+                            </transition>
+
+                            <!-- Purchase Cards -->
+                            <div v-if="purchases.length" class="purchases-list">
+                                <div v-for="(p, i) in purchases" :key="p.id" class="p-card p-card-stagger" :style="{
         borderLeftColor: gainLoss(p) >= 0 ? 'var(--gain)' : 'var(--loss)',
         borderColor: gainLoss(p) >= 0 ? 'var(--gain-border)' : 'var(--loss-border)',
         background: gainLoss(p) >= 0 ? 'var(--gain-bg)' : 'var(--loss-bg)',
         animationDelay: (i * 0.07) + 's'
     }">
-                            <template v-if="editIdx !== i">
-                                <!-- Card Header -->
-                                <div class="pcard-header">
-                                    <div class="pcard-weight-row">
-                                        <span class="pcard-weight">{{ p.weight }} <span class="pcard-unit">{{ t[p.unit]
-        || p.unit }}</span></span>
-                                        <span class="pcard-date">{{ formatDate(p.date) }}</span>
-                                    </div>
-                                    <div class="pcard-btns">
-                                        <button class="pcard-btn" @click="startEdit(i)" :aria-label="t.edit">✎</button>
-                                        <button class="pcard-btn danger" @click="removePurchase(i)"
-                                            :aria-label="t.delete">✕</button>
-                                    </div>
-                                </div>
-                                <!-- GL Bar -->
-                                <div class="gl-row">
-                                    <div class="gl-col">
-                                        <span class="gl-label">{{ t.paid }}</span>
-                                        <span class="gl-val">${{ p.price.toFixed(2) }}</span>
-                                    </div>
-                                    <div class="gl-divider" />
-                                    <div class="gl-col">
-                                        <span class="gl-label">{{ t.current }}</span>
-                                        <span class="gl-val" :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">${{
+                                    <template v-if="editIdx !== i">
+                                        <div class="pcard-header">
+                                            <div class="pcard-weight-row">
+                                                <span class="pcard-weight">{{ p.weight }} <span class="pcard-unit">{{
+        t[p.unit] || p.unit }}</span></span>
+                                                <span class="pcard-date">{{ formatDate(p.date) }}</span>
+                                            </div>
+                                            <div class="pcard-btns">
+                                                <button class="pcard-btn" @click="startEdit(i)"
+                                                    :aria-label="t.edit">✎</button>
+                                                <button class="pcard-btn danger" @click="removePurchase(i)"
+                                                    :aria-label="t.delete">✕</button>
+                                            </div>
+                                        </div>
+                                        <div class="gl-row">
+                                            <div class="gl-col">
+                                                <span class="gl-label">{{ t.paid }}</span>
+                                                <span class="gl-val">${{ p.price.toFixed(2) }}</span>
+                                            </div>
+                                            <div class="gl-divider" />
+                                            <div class="gl-col">
+                                                <span class="gl-label">{{ t.current }}</span>
+                                                <span class="gl-val"
+                                                    :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">${{
         currentValue(p).toFixed(2) }}</span>
-                                    </div>
-                                    <div class="gl-divider" />
-                                    <div class="gl-col">
-                                        <span class="gl-label" :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">{{
-        gainLoss(p) >= 0 ? t.gain : t.loss }}</span>
-                                        <span class="gl-val gl-main"
-                                            :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">
-                                            {{ gainLoss(p) >= 0 ? '+' : '' }}${{ gainLoss(p).toFixed(2) }}
-                                        </span>
-                                    </div>
-                                </div>
-                            </template>
+                                            </div>
+                                            <div class="gl-divider" />
+                                            <div class="gl-col">
+                                                <span class="gl-label"
+                                                    :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">{{ gainLoss(p)
+        >= 0 ? t.gain : t.loss }}</span>
+                                                <span class="gl-val gl-main"
+                                                    :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">
+                                                    {{ gainLoss(p) >= 0 ? '+' : '' }}${{ gainLoss(p).toFixed(2) }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </template>
 
-                            <!-- Edit Form -->
-                            <template v-else>
-                                <div class="form-grid">
-                                    <div class="form-field">
-                                        <label>{{ t.weight }}</label>
-                                        <input v-model.number="editDraft.weight" type="text" inputmode="decimal"
-                                            class="text-input" />
-                                    </div>
-                                    <div class="form-field">
-                                        <label>{{ t.unit }}</label>
-                                        <select v-model="editDraft.unit" class="text-input">
-                                            <option v-for="u in converterUnits" :key="u" :value="u">{{ t[u] || u }}
-                                            </option>
-                                        </select>
-                                    </div>
-                                    <div class="form-field">
-                                        <label>{{ t.pricePaid }}</label>
-                                        <input v-model.number="editDraft.price" type="text" inputmode="decimal"
-                                            class="text-input" />
-                                    </div>
-                                    <div class="form-field">
-                                        <label>{{ t.date }}</label>
-                                        <input v-model="editDraft.date" type="date" class="text-input" />
-                                    </div>
+                                    <template v-else>
+                                        <div class="form-grid">
+                                            <div class="form-field">
+                                                <label>{{ t.weight }}</label>
+                                                <input v-model.number="editDraft.weight" type="text" inputmode="decimal"
+                                                    class="text-input" />
+                                            </div>
+                                            <div class="form-field">
+                                                <label>{{ t.unit }}</label>
+                                                <select v-model="editDraft.unit" class="text-input">
+                                                    <option v-for="u in converterUnits" :key="u" :value="u">{{ t[u] || u
+                                                        }}</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-field">
+                                                <label>{{ t.pricePaid }}</label>
+                                                <input v-model.number="editDraft.price" type="text" inputmode="decimal"
+                                                    class="text-input" />
+                                            </div>
+                                            <div class="form-field">
+                                                <label>{{ t.date }}</label>
+                                                <input v-model="editDraft.date" type="date" class="text-input" />
+                                            </div>
+                                        </div>
+                                        <div class="edit-actions">
+                                            <button class="primary-btn" style="flex:1" @click="saveEdit">{{ t.save
+                                                }}</button>
+                                            <button class="ghost-btn" style="flex:1" @click="editIdx = null">{{ t.cancel
+                                                }}</button>
+                                        </div>
+                                    </template>
                                 </div>
-                                <div class="edit-actions">
-                                    <button class="primary-btn" style="flex:1" @click="saveEdit">{{ t.save }}</button>
-                                    <button class="ghost-btn" style="flex:1" @click="editIdx = null">{{ t.cancel
-                                        }}</button>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
+                            </div>
 
-                    <!-- Portfolio Summary -->
-                    <div v-if="purchases.length" class="summary">
-                        <div class="sum-row">
-                            <div class="sum-item">
-                                <span class="sum-label">{{ t.totalInvested }}</span>
-                                <span class="sum-val">${{ totalInvested.toFixed(2) }}</span>
+                            <div v-else-if="!showForm" class="empty-state">
+                                <span class="empty-icon">◈</span>
+                                <p>{{ t.noPurchases }}</p>
                             </div>
-                            <div class="sum-item" :class="totalGL >= 0 ? 'gain' : 'loss'">
-                                <span class="sum-label">{{ t.currentValue }}</span>
-                                <span class="sum-val">${{ totalCurrent.toFixed(2) }}</span>
+                        </template>
+                    </section>
+                </div>
+
+                <!-- ── RIGHT COLUMN: Portfolio Summary ── -->
+                <div class="col-right">
+
+                    <!-- Portfolio KPI Cards -->
+                    <section class="card summary-card" v-if="!purchasesLocked && purchases.length">
+                        <div class="card-accent" />
+                        <h2 class="section-title">{{ t.portfolioSummary }}</h2>
+
+                        <div class="kpi-stack">
+                            <div class="kpi-item">
+                                <span class="kpi-label">{{ t.totalInvested }}</span>
+                                <span class="kpi-val">${{ totalInvested.toFixed(2) }}</span>
                             </div>
-                            <div class="sum-item" :class="totalGL >= 0 ? 'gain' : 'loss'">
-                                <span class="sum-label">{{ t.totalGainLoss }}</span>
-                                <span class="sum-val">{{ totalGL >= 0 ? '+' : '' }}${{ totalGL.toFixed(2) }}</span>
+                            <div class="kpi-item" :class="totalGL >= 0 ? 'kpi-gain' : 'kpi-loss'">
+                                <span class="kpi-label">{{ t.currentValue }}</span>
+                                <span class="kpi-val">${{ totalCurrent.toFixed(2) }}</span>
+                            </div>
+                            <div class="kpi-item kpi-big" :class="totalGL >= 0 ? 'kpi-gain' : 'kpi-loss'">
+                                <span class="kpi-label">{{ t.totalGainLoss }}</span>
+                                <span class="kpi-val kpi-main">{{ totalGL >= 0 ? '+' : '' }}${{ totalGL.toFixed(2)
+                                    }}</span>
                             </div>
                         </div>
+
                         <div v-if="totalInvested > 0" class="portfolio-bar">
                             <div class="portfolio-fill" :class="totalGL >= 0 ? 'gain' : 'loss'"
                                 :style="{ width: Math.min(Math.abs(totalGL / totalInvested) * 100, 100) + '%' }" />
@@ -367,15 +414,59 @@
                         <div v-if="totalInvested > 0" class="portfolio-pct" :class="totalGL >= 0 ? 'gain' : 'loss'">
                             {{ totalGL >= 0 ? '▲' : '▼' }} {{ Math.abs(totalGL / totalInvested * 100).toFixed(1) }}%
                         </div>
-                    </div>
+                    </section>
 
-                    <div v-else-if="!showForm" class="empty-state">
-                        <span class="empty-icon">◈</span>
-                        <p>{{ t.noPurchases }}</p>
-                    </div>
+                    <!-- Placeholder when locked -->
+                    <section class="card summary-card summary-locked" v-else-if="purchasesLocked">
+                        <div class="card-accent" />
+                        <h2 class="section-title">{{ t.portfolioSummary }}</h2>
+                        <div class="locked-placeholder">
+                            <span class="locked-icon">🔒</span>
+                            <p>Unlock purchases to see portfolio summary</p>
+                        </div>
+                    </section>
 
-                </template>
-            </section>
+                    <!-- Per-purchase breakdown table -->
+                    <section class="card" v-if="!purchasesLocked && purchases.length && goldPrice">
+                        <h2 class="section-title">Holdings</h2>
+                        <div class="holdings-table">
+                            <div class="ht-header">
+                                <span>Weight</span>
+                                <span>Paid</span>
+                                <span>Now</span>
+                                <span>G/L</span>
+                            </div>
+                            <div v-for="(p, i) in purchases" :key="p.id" class="ht-row"
+                                :class="gainLoss(p) >= 0 ? 'ht-gain' : 'ht-loss'">
+                                <span class="ht-weight">{{ p.weight }}<em>{{ t[p.unit] || p.unit }}</em></span>
+                                <span>${{ p.price.toFixed(0) }}</span>
+                                <span>${{ currentValue(p).toFixed(0) }}</span>
+                                <span :class="gainLoss(p) >= 0 ? 'gain-text' : 'loss-text'">
+                                    {{ gainLoss(p) >= 0 ? '+' : '' }}${{ gainLoss(p).toFixed(0) }}
+                                </span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Damlung price quick-ref -->
+                    <section class="card" v-if="goldPrice">
+                        <h2 class="section-title">Quick Reference</h2>
+                        <div class="qref-list">
+                            <div v-for="qty in [1, 2, 5, 10]" :key="qty" class="qref-row">
+                                <span class="qref-label">{{ qty }} Chi</span>
+                                <span class="qref-val">${{ (pricePerGram * 3.75 * qty).toFixed(2) }}</span>
+                            </div>
+                            <div class="qref-divider" />
+                            <div v-for="qty in [1, 2, 5]" :key="'d'+qty" class="qref-row">
+                                <span class="qref-label">{{ qty }} Damlung</span>
+                                <span class="qref-val">${{ (pricePerGram * 37.5 * qty).toFixed(2) }}</span>
+                            </div>
+                        </div>
+                    </section>
+
+                </div>
+            </div>
+            <!-- END DESKTOP GRID -->
 
         </main>
 
@@ -398,7 +489,7 @@ const LI = 0.0375
 const converterUnits = ['li', 'hun', 'chi', 'gram', 'damlung', 'troyOz']
 
 // ─── Pre-loaded purchases (owner only) ───────────────────────────────────────
-const OWNER_PW_HASH = '5b91bc1234678bc03abe05d9966d30d1911a16d510605ea015b37cd3be316e05' // sha256("ousa123")
+const OWNER_PW_HASH = '5b91bc1234678bc03abe05d9966d30d1911a16d510605ea015b37cd3be316e05'
 const PRE_PURCHASES = [
     { id: 'pre_1', weight: 1, unit: 'chi', price: 610, date: '2024-01-01' },
     { id: 'pre_2', weight: 1, unit: 'chi', price: 518, date: '2024-01-01' },
@@ -427,13 +518,14 @@ const activeConv = ref('chi')
 const convInput = ref(1)
 const showForm = ref(false)
 const showStickyPrice = ref(false)
+const activeTab = ref('price')
 const purchases = ref([])
 const draft = ref({ weight: '', unit: 'chi', price: '', date: today() })
 const editIdx = ref(null)
 const editDraft = ref({})
 const csvInput = ref(null)
 
-// ─── Animation State ─────────────────────────────────────────────────────────
+// ─── Animation State ──────────────────────────────────────────────────────────
 const animatedPrice = ref(null)
 let priceCounterTimer = null
 
@@ -464,7 +556,7 @@ const pwShake = ref(false)
 const pwUnlockBurst = ref(false)
 const purchasesGlow = ref(false)
 
-// ─── i18n ────────────────────────────────────────────────────────────────────
+// ─── i18n ─────────────────────────────────────────────────────────────────────
 const translations = {
     en: {
         title: 'Gold Tracker',
@@ -657,15 +749,13 @@ async function unlockPurchases() {
     const hash = await sha256(pwInput.value)
 
     if (hash === OWNER_PW_HASH) {
-        // Owner — pre-purchases + any extras they added
         isOwner.value = true
         const extra = JSON.parse(localStorage.getItem('gt4_owner_extra') || '[]')
         purchases.value = [...PRE_PURCHASES, ...extra]
     } else {
-        // Regular user — their own purchases stored under their password hash key
         isOwner.value = false
         const userKey = 'gt4_u_' + hash.slice(0, 16)
-        sessionStorage.setItem('gt4_ukey', userKey) // remember key for this session
+        sessionStorage.setItem('gt4_ukey', userKey)
         purchases.value = JSON.parse(localStorage.getItem(userKey) || '[]')
     }
 
@@ -797,14 +887,12 @@ function importCSV(e) {
 // ─── Persistence ──────────────────────────────────────────────────────────────
 function save() {
     try {
-        // Save app settings
         localStorage.setItem('gt4', JSON.stringify({
             lang: lang.value, isDark: isDark.value, goldPrice: goldPrice.value,
             lastUpdated: lastUpdated.value, priceMethod: priceMethod.value,
             customPrice: customPrice.value, customApiUrl: customApiUrl.value,
             priceSource: priceSource.value,
         }))
-        // Save purchases per user type
         if (!purchasesLocked.value) {
             if (isOwner.value) {
                 const extra = purchases.value.filter(p => !PRE_PURCHASES.find(pp => pp.id === p.id))
@@ -831,7 +919,6 @@ onMounted(() => {
         customPrice.value = d.customPrice || null; customApiUrl.value = d.customApiUrl || ''
         priceSource.value = d.priceSource || 'api'
     }
-    // Always start locked — user must enter password to see purchases
     purchasesLocked.value = true
     if (priceSource.value === 'api') fetchPrice()
     window.addEventListener('online', handleOnline)
@@ -872,7 +959,7 @@ onBeforeUnmount(() => {
     --radius-lg: 20px;
     --font: 'Outfit', system-ui, sans-serif;
     --mono: 'DM Mono', ui-monospace, monospace;
-    --touch: 52px;
+    --touch: 44px;
 }
 
 .app.dark {
@@ -913,6 +1000,7 @@ onBeforeUnmount(() => {
     overflow-x: hidden;
 }
 
+/* ── Ambient ── */
 .ambient {
     position: fixed;
     inset: 0;
@@ -925,29 +1013,38 @@ onBeforeUnmount(() => {
     position: absolute;
     border-radius: 50%;
     filter: blur(90px);
-    opacity: 0.14;
+    opacity: 0.13;
 }
 
 .orb-1 {
-    width: 420px;
-    height: 420px;
+    width: 500px;
+    height: 500px;
     background: #F5C842;
-    top: -120px;
-    right: -80px;
+    top: -150px;
+    right: -100px;
     animation: drift 14s ease-in-out infinite alternate;
 }
 
 .orb-2 {
-    width: 280px;
-    height: 280px;
+    width: 300px;
+    height: 300px;
     background: #A07020;
-    bottom: 25%;
-    left: -60px;
+    bottom: 20%;
+    left: -80px;
     animation: drift 18s ease-in-out infinite alternate-reverse;
 }
 
+.orb-3 {
+    width: 200px;
+    height: 200px;
+    background: #F5A623;
+    bottom: 10%;
+    right: 15%;
+    animation: drift 22s ease-in-out infinite alternate;
+}
+
 .app:not(.dark) .orb {
-    opacity: 0.08;
+    opacity: 0.07;
 }
 
 @keyframes drift {
@@ -960,6 +1057,7 @@ onBeforeUnmount(() => {
     }
 }
 
+/* ── Header ── */
 .header {
     position: sticky;
     top: 0;
@@ -975,13 +1073,13 @@ onBeforeUnmount(() => {
 }
 
 .header-inner {
-    max-width: 640px;
+    max-width: 1400px;
     margin: 0 auto;
-    padding: 10px 16px;
+    padding: 10px 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
 }
 
 .logo {
@@ -989,6 +1087,7 @@ onBeforeUnmount(() => {
     align-items: center;
     gap: 10px;
     min-width: 0;
+    flex-shrink: 0;
 }
 
 .logo-gem {
@@ -1001,7 +1100,6 @@ onBeforeUnmount(() => {
 .logo-text {
     display: flex;
     flex-direction: column;
-    min-width: 0;
 }
 
 .logo-title {
@@ -1009,8 +1107,6 @@ onBeforeUnmount(() => {
     font-weight: 800;
     letter-spacing: -0.3px;
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .logo-sub {
@@ -1018,6 +1114,36 @@ onBeforeUnmount(() => {
     color: var(--text-3);
     letter-spacing: 0.05em;
     margin-top: 1px;
+}
+
+/* Desktop nav tabs — hidden on mobile */
+.desktop-nav {
+    display: none;
+    gap: 4px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 4px;
+}
+
+.nav-tab {
+    padding: 8px 18px;
+    border-radius: 9px;
+    border: none;
+    background: transparent;
+    color: var(--text-2);
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.nav-tab.active {
+    background: var(--gold-alpha);
+    color: var(--gold);
+    border: 1px solid var(--gold-border);
 }
 
 .header-controls {
@@ -1062,6 +1188,7 @@ onBeforeUnmount(() => {
     border-top: 1px solid var(--gold-border);
 }
 
+/* ── Sticky Price ── */
 .sticky-price {
     position: fixed;
     top: 0;
@@ -1147,24 +1274,38 @@ onBeforeUnmount(() => {
     font-size: 20px;
     padding: 4px;
     transition: color 0.2s;
-    min-height: unset;
 }
 
 .sticky-refresh:hover {
     color: var(--gold);
 }
 
+/* ── Main layout ── */
 .main {
     position: relative;
     z-index: 1;
-    max-width: 640px;
+    max-width: 1400px;
     margin: 0 auto;
-    padding: 12px 12px 72px;
+    padding: 16px 16px 72px;
+}
+
+/* Mobile: single stacked column */
+.desktop-grid {
     display: flex;
     flex-direction: column;
     gap: 10px;
 }
 
+.col-left,
+.col-center,
+.col-right {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+}
+
+/* ── Cards ── */
 .card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -1183,25 +1324,26 @@ onBeforeUnmount(() => {
     background: linear-gradient(90deg, transparent, var(--gold), transparent);
 }
 
+/* ── Seg control ── */
 .seg-ctrl {
     display: flex;
     background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 3px;
-    margin-bottom: 18px;
+    margin-bottom: 16px;
     gap: 3px;
 }
 
 .seg-btn {
     flex: 1;
-    padding: 12px 12px;
+    padding: 10px 12px;
     border-radius: 8px;
     border: none;
     background: transparent;
     color: var(--text-2);
     font-family: var(--font);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
@@ -1213,6 +1355,7 @@ onBeforeUnmount(() => {
     border: 1px solid var(--gold-border);
 }
 
+/* ── Hero Price ── */
 .hero-price-block {
     margin-bottom: 14px;
 }
@@ -1243,11 +1386,10 @@ onBeforeUnmount(() => {
     gap: 2px;
     line-height: 1;
     margin-bottom: 4px;
-    perspective: 400px;
 }
 
 .price-dollar {
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 800;
     color: var(--gold);
     align-self: flex-start;
@@ -1255,7 +1397,7 @@ onBeforeUnmount(() => {
 }
 
 .price-int {
-    font-size: clamp(44px, 12vw, 72px);
+    font-size: clamp(40px, 10vw, 64px);
     font-weight: 800;
     color: var(--gold);
     letter-spacing: -2px;
@@ -1263,10 +1405,9 @@ onBeforeUnmount(() => {
 }
 
 .price-dec {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
     color: var(--gold-dim);
-    letter-spacing: 0;
 }
 
 .price-unit-label {
@@ -1275,6 +1416,7 @@ onBeforeUnmount(() => {
     font-family: var(--mono);
 }
 
+/* ── Chips: scrollable on mobile, grid on desktop ── */
 .chips-scroll {
     display: flex;
     gap: 6px;
@@ -1282,24 +1424,27 @@ onBeforeUnmount(() => {
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     padding: 2px 0 10px;
-    margin: 0 -4px;
-    padding-left: 4px;
 }
 
 .chips-scroll::-webkit-scrollbar {
     display: none;
 }
 
+.chips-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
 .chip {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    flex-shrink: 0;
     background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 8px 10px;
-    min-width: 64px;
 }
 
 .chip-label {
@@ -1317,6 +1462,7 @@ onBeforeUnmount(() => {
     font-family: var(--mono);
 }
 
+/* ── Progress / Flash ── */
 .progress-bar {
     height: 3px;
     background: var(--surface3);
@@ -1365,6 +1511,7 @@ onBeforeUnmount(() => {
     color: var(--loss);
 }
 
+/* ── Sub panel ── */
 .sub-panel {
     margin-top: 14px;
     padding-top: 14px;
@@ -1475,6 +1622,7 @@ onBeforeUnmount(() => {
     border-radius: 0 10px 10px 0 !important;
 }
 
+/* ── Inputs / Buttons ── */
 .text-input {
     background: var(--surface2);
     border: 1px solid var(--border);
@@ -1483,7 +1631,7 @@ onBeforeUnmount(() => {
     font-family: var(--font);
     font-size: 16px;
     font-weight: 500;
-    padding: 6px 12px;
+    padding: 8px 12px;
     width: 100%;
     transition: border-color 0.2s;
     -webkit-appearance: none;
@@ -1508,8 +1656,8 @@ onBeforeUnmount(() => {
     color: #1A1000;
     border: none;
     border-radius: 12px;
-    padding: 14px 22px;
-    font-size: 15px;
+    padding: 12px 20px;
+    font-size: 14px;
     font-weight: 700;
     font-family: var(--font);
     cursor: pointer;
@@ -1534,7 +1682,6 @@ onBeforeUnmount(() => {
 
 .refresh-btn {
     flex-shrink: 0;
-    padding: 14px 20px;
 }
 
 .full-btn {
@@ -1550,8 +1697,8 @@ onBeforeUnmount(() => {
     border: 1px solid var(--border);
     color: var(--text-2);
     border-radius: 12px;
-    padding: 14px 18px;
-    font-size: 14px;
+    padding: 10px 16px;
+    font-size: 13px;
     font-weight: 600;
     font-family: var(--font);
     cursor: pointer;
@@ -1598,8 +1745,9 @@ onBeforeUnmount(() => {
     }
 }
 
+/* ── Section titles ── */
 .section-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 700;
     letter-spacing: 0.02em;
     color: var(--text);
@@ -1632,10 +1780,11 @@ onBeforeUnmount(() => {
 }
 
 .lock-btn {
-    padding: 10px 12px;
-    font-size: 16px;
+    padding: 8px 10px;
+    font-size: 14px;
 }
 
+/* ── Converter ── */
 .conv-tabs-scroll {
     display: flex;
     gap: 5px;
@@ -1651,12 +1800,12 @@ onBeforeUnmount(() => {
 }
 
 .conv-tab {
-    padding: 10px 14px;
+    padding: 8px 12px;
     border: 1px solid var(--border);
     background: var(--surface2);
     color: var(--text-2);
     font-family: var(--font);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     border-radius: 8px;
     white-space: nowrap;
@@ -1682,9 +1831,9 @@ onBeforeUnmount(() => {
     border: 1px solid var(--gold-border);
     border-right: none;
     border-radius: 10px 0 0 10px;
-    padding: 14px 14px;
+    padding: 12px 12px;
     color: var(--gold);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
     display: flex;
     align-items: center;
@@ -1694,7 +1843,7 @@ onBeforeUnmount(() => {
 
 .conv-input {
     border-radius: 0 10px 10px 0 !important;
-    font-size: 18px !important;
+    font-size: 16px !important;
     font-family: var(--mono) !important;
 }
 
@@ -1709,7 +1858,7 @@ onBeforeUnmount(() => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 12px 14px;
+    padding: 10px 14px;
     border-bottom: 1px solid var(--border);
     gap: 8px;
 }
@@ -1719,18 +1868,19 @@ onBeforeUnmount(() => {
 }
 
 .conv-label {
-    font-size: 14px;
+    font-size: 13px;
     color: var(--text-2);
     font-weight: 500;
 }
 
 .conv-val {
-    font-size: 14px;
+    font-size: 13px;
     font-family: var(--mono);
     font-weight: 600;
     color: var(--text);
 }
 
+/* ── Unit grid ── */
 .unit-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -1759,7 +1909,7 @@ onBeforeUnmount(() => {
 }
 
 .tile-name {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     color: var(--text-2);
     text-transform: uppercase;
@@ -1829,6 +1979,7 @@ onBeforeUnmount(() => {
     font-weight: 500;
 }
 
+/* ── Add purchase ── */
 .add-purchase-btn {
     display: flex;
     align-items: center;
@@ -1840,11 +1991,11 @@ onBeforeUnmount(() => {
     border-radius: 14px;
     color: var(--text-2);
     font-family: var(--font);
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    padding: 16px 20px;
+    padding: 14px 20px;
     margin-bottom: 12px;
 }
 
@@ -1855,7 +2006,7 @@ onBeforeUnmount(() => {
 }
 
 .add-icon {
-    font-size: 22px;
+    font-size: 20px;
     line-height: 1;
 }
 
@@ -1888,6 +2039,7 @@ onBeforeUnmount(() => {
     letter-spacing: 0.07em;
 }
 
+/* ── Purchase cards ── */
 .purchases-list {
     display: flex;
     flex-direction: column;
@@ -1920,14 +2072,14 @@ onBeforeUnmount(() => {
 }
 
 .pcard-weight {
-    font-size: 17px;
+    font-size: 16px;
     font-weight: 800;
     color: var(--text);
     font-variant-numeric: tabular-nums;
 }
 
 .pcard-unit {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-2);
 }
@@ -1949,10 +2101,10 @@ onBeforeUnmount(() => {
     border: 1px solid var(--border);
     color: var(--text-2);
     border-radius: 8px;
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
-    min-height: 40px;
-    min-width: 40px;
+    min-height: 36px;
+    min-width: 36px;
     transition: all 0.2s;
     display: inline-flex;
     align-items: center;
@@ -1998,7 +2150,7 @@ onBeforeUnmount(() => {
 }
 
 .gl-label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     color: var(--text-3);
     text-transform: uppercase;
@@ -2006,14 +2158,14 @@ onBeforeUnmount(() => {
 }
 
 .gl-val {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
     font-family: var(--mono);
     color: var(--text);
 }
 
 .gl-main {
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .gain-text {
@@ -2029,83 +2181,84 @@ onBeforeUnmount(() => {
     gap: 8px;
 }
 
-.summary {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 14px;
+/* ── Portfolio / KPI (right col) ── */
+.summary-card {
+    position: relative;
+    overflow: hidden;
 }
 
-.sum-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-    margin-bottom: 12px;
-}
-
-.sum-item {
+.kpi-stack {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 10px 10px;
+    gap: 8px;
+    margin-bottom: 14px;
 }
 
-.sum-item.gain {
+.kpi-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+
+.kpi-item.kpi-gain {
     background: var(--gain-bg);
     border-color: var(--gain-border);
     border-left: 3px solid var(--gain);
 }
 
-.sum-item.loss {
+.kpi-item.kpi-loss {
     background: var(--loss-bg);
     border-color: var(--loss-border);
     border-left: 3px solid var(--loss);
 }
 
-.sum-label {
-    font-size: 10px;
+.kpi-item.kpi-big {
+    padding: 16px 14px;
+}
+
+.kpi-label {
+    font-size: 11px;
     font-weight: 700;
     color: var(--text-3);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
-.sum-val {
-    font-size: clamp(12px, 3.5vw, 16px);
+.kpi-val {
+    font-size: 18px;
     font-weight: 800;
     color: var(--text);
     font-family: var(--mono);
     font-variant-numeric: tabular-nums;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
-.sum-item.gain .sum-val {
+.kpi-main {
+    font-size: 22px;
+}
+
+.kpi-gain .kpi-val {
     color: var(--gain);
 }
 
-.sum-item.loss .sum-val {
+.kpi-loss .kpi-val {
     color: var(--loss);
 }
 
 .portfolio-bar {
-    height: 4px;
+    height: 5px;
     background: var(--surface3);
-    border-radius: 2px;
+    border-radius: 3px;
     overflow: hidden;
     margin-bottom: 6px;
 }
 
 .portfolio-fill {
     height: 100%;
-    border-radius: 2px;
+    border-radius: 3px;
     transition: width 0.6s ease;
 }
 
@@ -2132,6 +2285,138 @@ onBeforeUnmount(() => {
     color: var(--loss);
 }
 
+/* ── Locked placeholder ── */
+.locked-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 24px 16px;
+    background: var(--surface2);
+    border-radius: 12px;
+    border: 1.5px dashed var(--border);
+}
+
+.locked-icon {
+    font-size: 28px;
+    color: var(--text-3);
+}
+
+.locked-placeholder p {
+    font-size: 12px;
+    color: var(--text-3);
+    text-align: center;
+}
+
+/* ── Holdings table ── */
+.holdings-table {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.ht-header {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 0;
+    padding: 8px 12px;
+    background: var(--surface3);
+    border-bottom: 1px solid var(--border);
+}
+
+.ht-header span {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.ht-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 0;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    align-items: center;
+    font-size: 12px;
+    font-family: var(--mono);
+    font-weight: 600;
+    transition: background 0.15s;
+}
+
+.ht-row:last-child {
+    border-bottom: none;
+}
+
+.ht-row:hover {
+    background: var(--surface3);
+}
+
+.ht-weight {
+    font-weight: 700;
+    color: var(--text);
+}
+
+.ht-weight em {
+    font-style: normal;
+    font-size: 10px;
+    color: var(--text-3);
+    margin-left: 2px;
+}
+
+.ht-gain {
+    border-left: 2px solid var(--gain);
+}
+
+.ht-loss {
+    border-left: 2px solid var(--loss);
+}
+
+/* ── Quick Reference ── */
+.qref-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.qref-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+.qref-row:last-child {
+    border-bottom: none;
+}
+
+.qref-label {
+    font-size: 13px;
+    color: var(--text-2);
+    font-weight: 500;
+}
+
+.qref-val {
+    font-size: 13px;
+    font-family: var(--mono);
+    font-weight: 700;
+    color: var(--gold);
+}
+
+.qref-divider {
+    height: 1px;
+    background: var(--border-hi);
+    margin: 0;
+}
+
+/* ── Empty state ── */
 .empty-state {
     display: flex;
     flex-direction: column;
@@ -2155,6 +2440,7 @@ onBeforeUnmount(() => {
     text-align: center;
 }
 
+/* ── Footer ── */
 .footer {
     text-align: center;
     padding: 20px 16px;
@@ -2164,6 +2450,7 @@ onBeforeUnmount(() => {
     border-top: 1px solid var(--border);
 }
 
+/* ── Transitions ── */
 @keyframes priceFlipOut {
     to {
         opacity: 0;
@@ -2219,55 +2506,7 @@ onBeforeUnmount(() => {
     max-height: 700px;
 }
 
-@media (min-width: 480px) {
-    .main {
-        padding: 16px 16px 72px;
-    }
-
-    .unit-grid {
-        grid-template-columns: repeat(6, 1fr);
-    }
-
-    .chips-scroll {
-        overflow: visible;
-        flex-wrap: wrap;
-    }
-
-    .form-grid {
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    }
-
-    .purchases-list {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .summary .sum-row {
-        grid-template-columns: repeat(3, 1fr);
-    }
-}
-
-@media (min-width: 640px) {
-    .card {
-        padding: 22px 20px;
-    }
-
-    .header-inner {
-        padding: 12px 20px;
-    }
-}
-
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-    .main {
-        padding-bottom: calc(72px + env(safe-area-inset-bottom));
-    }
-
-    .header {
-        padding-top: env(safe-area-inset-top);
-    }
-}
-
-/* ── Animation: Chip shimmer ── */
+/* ── Chip shimmer animation ── */
 @keyframes shimmerSwipe {
     0% {
         transform: translateX(-100%);
@@ -2294,7 +2533,7 @@ onBeforeUnmount(() => {
     animation: shimmerSwipe 0.7s ease forwards;
 }
 
-/* ── Animation: Card stagger entrance ── */
+/* ── Card stagger ── */
 @keyframes cardSlideIn {
     from {
         opacity: 0;
@@ -2312,7 +2551,7 @@ onBeforeUnmount(() => {
     animation: cardSlideIn 0.35s ease forwards;
 }
 
-/* ── Animation: Lock shake ── */
+/* ── Lock shake ── */
 @keyframes lockShake {
 
     0%,
@@ -2349,7 +2588,7 @@ onBeforeUnmount(() => {
     animation: lockShake 0.5s ease;
 }
 
-/* ── Animation: Unlock burst rings ── */
+/* ── Unlock burst ── */
 @keyframes burstRing {
     0% {
         transform: scale(0.5);
@@ -2406,7 +2645,7 @@ onBeforeUnmount(() => {
     animation: burstRing2 0.55s ease-out 0.1s forwards;
 }
 
-/* ── Animation: Section glow pulse ── */
+/* ── Section glow ── */
 @keyframes sectionGlow {
     0% {
         box-shadow: 0 0 0 0 rgba(245, 200, 66, 0);
@@ -2423,5 +2662,135 @@ onBeforeUnmount(() => {
 
 .section-glow {
     animation: sectionGlow 0.9s ease-out forwards;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════ */
+/* DESKTOP BREAKPOINTS                                                       */
+/* ══════════════════════════════════════════════════════════════════════════ */
+
+/* Tablet: 2 columns */
+@media (min-width: 768px) {
+    .main {
+        padding: 20px 20px 72px;
+    }
+
+    .desktop-grid {
+        display: grid;
+        grid-template-columns: 300px 1fr;
+        grid-template-rows: auto;
+        gap: 12px;
+        align-items: start;
+    }
+
+    .col-left {
+        grid-column: 1;
+        grid-row: 1 / 3;
+        position: sticky;
+        top: 72px;
+        max-height: calc(100vh - 88px);
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border) transparent;
+        padding-right: 2px;
+    }
+
+    .col-center {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .col-right {
+        grid-column: 2;
+        grid-row: 2;
+    }
+
+    .unit-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .purchases-list {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Full desktop: 3 columns */
+@media (min-width: 1100px) {
+    .main {
+        padding: 24px 24px 72px;
+    }
+
+    .desktop-nav {
+        display: flex;
+    }
+
+    .desktop-grid {
+        grid-template-columns: 280px 1fr 260px;
+        grid-template-rows: auto;
+        gap: 14px;
+    }
+
+    .col-left {
+        grid-column: 1;
+        grid-row: 1;
+        position: sticky;
+        top: 72px;
+        max-height: calc(100vh - 88px);
+        overflow-y: auto;
+    }
+
+    .col-center {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .col-right {
+        grid-column: 3;
+        grid-row: 1;
+        position: sticky;
+        top: 72px;
+        max-height: calc(100vh - 88px);
+        overflow-y: auto;
+    }
+
+    .unit-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .purchases-list {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    /* Larger price on desktop */
+    .price-int {
+        font-size: 52px;
+    }
+
+    .chips-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Wide desktop: expand center */
+@media (min-width: 1280px) {
+    .desktop-grid {
+        grid-template-columns: 300px 1fr 280px;
+    }
+
+    .purchases-list {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Safe area */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .main {
+        padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    }
+
+    .header {
+        padding-top: env(safe-area-inset-top);
+    }
 }
 </style>
