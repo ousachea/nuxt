@@ -17,19 +17,7 @@
                         <span class="logo-sub">gold portfolio tracker</span>
                     </div>
                 </div>
-                <!-- Desktop nav tabs -->
-                <nav class="desktop-nav">
-                    <button class="nav-tab" :class="{ active: activeTab === 'price' }" @click="activeTab = 'price'">
-                        ⬡ Price
-                    </button>
-                    <button class="nav-tab" :class="{ active: activeTab === 'convert' }" @click="activeTab = 'convert'">
-                        ⇄ Convert
-                    </button>
-                    <button class="nav-tab" :class="{ active: activeTab === 'portfolio' }"
-                        @click="activeTab = 'portfolio'">
-                        💰 Portfolio
-                    </button>
-                </nav>
+
                 <div class="header-controls">
                     <button class="ctrl-btn" @click="toggleDark" :aria-label="isDark ? 'Light mode' : 'Dark mode'">
                         <span>{{ isDark ? '☀' : '◑' }}</span>
@@ -92,11 +80,18 @@
                         <div class="hero-price-block">
                             <div class="hero-meta-row">
                                 <span class="metal-tag">🥇 {{ t.gold }}</span>
-                                <span v-if="lastUpdated && priceSource === 'api'" class="last-updated">{{ lastUpdated
-                                    }}</span>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <transition name="fade">
+                                        <span v-if="priceTickDir" class="tick-arrow" :class="priceTickDir">{{
+        priceTickDir === 'up' ? '▲' : '▼' }}</span>
+                                    </transition>
+                                    <span v-if="lastUpdated && priceSource === 'api'" class="last-updated">{{
+        lastUpdated }}</span>
+                                </div>
                             </div>
                             <transition name="price-flip" mode="out-in">
-                                <div class="hero-price" :key="goldPrice?.toFixed(0) ?? 'null'">
+                                <div class="hero-price" :class="priceTickDir ? `price-tick-${priceTickDir}` : ''"
+                                    :key="goldPrice?.toFixed(0) ?? 'null'">
                                     <span class="price-dollar">$</span>
                                     <span class="price-int">{{ animatedPrice ?
         Math.floor(animatedPrice).toLocaleString() : '——' }}</span>
@@ -535,7 +530,6 @@ const activeConv = ref('chi')
 const convInput = ref(1)
 const showForm = ref(false)
 const showStickyPrice = ref(false)
-const activeTab = ref('price')
 const purchases = ref([])
 const draft = ref({ weight: '', unit: 'chi', price: '', date: today() })
 const editIdx = ref(null)
@@ -544,7 +538,9 @@ const csvInput = ref(null)
 
 // ─── Animation State ──────────────────────────────────────────────────────────
 const animatedPrice = ref(null)
+const priceTickDir = ref(null) // 'up' | 'down' | null
 let priceCounterTimer = null
+let priceSimTimer = null
 
 function animateCounterTo(target) {
     if (priceCounterTimer) clearInterval(priceCounterTimer)
@@ -562,6 +558,26 @@ function animateCounterTo(target) {
         }
         animatedPrice.value = current
     }, step)
+}
+
+function startPriceSim() {
+    stopPriceSim()
+    function tick() {
+        if (!goldPrice.value || loading.value || priceSource.value !== 'api') return
+        const delta = (Math.random() * 6 + 5) * (Math.random() < 0.5 ? 1 : -1)
+        const next = Math.max(1, goldPrice.value + delta)
+        priceTickDir.value = delta > 0 ? 'up' : 'down'
+        goldPrice.value = next
+        animateCounterTo(next)
+        setTimeout(() => { priceTickDir.value = null }, 900)
+        const wait = 3000 + Math.random() * 3000
+        priceSimTimer = setTimeout(tick, wait)
+    }
+    priceSimTimer = setTimeout(tick, 4000)
+}
+
+function stopPriceSim() {
+    if (priceSimTimer) { clearTimeout(priceSimTimer); priceSimTimer = null }
 }
 
 // ─── Password State ───────────────────────────────────────────────────────────
@@ -842,6 +858,7 @@ async function fetchPrice() {
         lastUpdated.value = new Date().toLocaleTimeString()
         animateCounterTo(goldPrice.value)
         save(); flash(t.value.pricesUpdated)
+        startPriceSim()
     } else {
         const cached = load()?.goldPrice
         if (cached) {
@@ -956,6 +973,7 @@ onBeforeUnmount(() => {
     window.removeEventListener('online', handleOnline)
     window.removeEventListener('offline', handleOffline)
     window.removeEventListener('scroll', handleScroll)
+    stopPriceSim()
 })
 </script>
 
@@ -1049,7 +1067,7 @@ onBeforeUnmount(() => {
     background: #F5C842;
     top: -150px;
     right: -100px;
-    animation: drift 14s ease-in-out infinite alternate;
+    animation: orbDrift1 16s ease-in-out infinite alternate;
 }
 
 .orb-2 {
@@ -1058,7 +1076,7 @@ onBeforeUnmount(() => {
     background: #A07020;
     bottom: 20%;
     left: -80px;
-    animation: drift 18s ease-in-out infinite alternate-reverse;
+    animation: orbDrift2 20s ease-in-out infinite alternate-reverse;
 }
 
 .orb-3 {
@@ -1067,20 +1085,66 @@ onBeforeUnmount(() => {
     background: #F5A623;
     bottom: 10%;
     right: 15%;
-    animation: drift 22s ease-in-out infinite alternate;
+    animation: orbDrift3 24s ease-in-out infinite alternate;
 }
 
 .app:not(.dark) .orb {
     opacity: 0.07;
 }
 
-@keyframes drift {
-    from {
+@keyframes orbDrift1 {
+    0% {
         transform: translate(0, 0) scale(1);
+        opacity: 0.13;
     }
 
-    to {
-        transform: translate(20px, 30px) scale(1.08);
+    33% {
+        transform: translate(-18px, 24px) scale(1.06);
+        opacity: 0.17;
+    }
+
+    66% {
+        transform: translate(12px, 10px) scale(0.96);
+        opacity: 0.11;
+    }
+
+    100% {
+        transform: translate(24px, 36px) scale(1.1);
+        opacity: 0.15;
+    }
+}
+
+@keyframes orbDrift2 {
+    0% {
+        transform: translate(0, 0) scale(1);
+        opacity: 0.13;
+    }
+
+    50% {
+        transform: translate(20px, -16px) scale(1.08);
+        opacity: 0.17;
+    }
+
+    100% {
+        transform: translate(-10px, 30px) scale(0.94);
+        opacity: 0.10;
+    }
+}
+
+@keyframes orbDrift3 {
+    0% {
+        transform: translate(0, 0) scale(1);
+        opacity: 0.13;
+    }
+
+    40% {
+        transform: translate(-14px, 20px) scale(1.12);
+        opacity: 0.18;
+    }
+
+    100% {
+        transform: translate(18px, -12px) scale(0.92);
+        opacity: 0.09;
     }
 }
 
@@ -1122,6 +1186,22 @@ onBeforeUnmount(() => {
     color: var(--gold);
     flex-shrink: 0;
     line-height: 1;
+    display: inline-block;
+    animation: gemPulse 4s ease-in-out infinite;
+}
+
+@keyframes gemPulse {
+
+    0%,
+    100% {
+        transform: scale(1) rotate(0deg);
+        filter: drop-shadow(0 0 0px transparent);
+    }
+
+    50% {
+        transform: scale(1.15) rotate(45deg);
+        filter: drop-shadow(0 0 6px rgba(245, 200, 66, 0.55));
+    }
 }
 
 .logo-text {
@@ -1143,35 +1223,6 @@ onBeforeUnmount(() => {
     margin-top: 1px;
 }
 
-/* Desktop nav tabs — hidden on mobile */
-.desktop-nav {
-    display: none;
-    gap: 4px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 4px;
-}
-
-.nav-tab {
-    padding: 8px 18px;
-    border-radius: 9px;
-    border: none;
-    background: transparent;
-    color: var(--text-2);
-    font-family: var(--font);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-}
-
-.nav-tab.active {
-    background: var(--gold-alpha);
-    color: var(--gold);
-    border: 1px solid var(--gold-border);
-}
 
 .header-controls {
     display: flex;
@@ -1407,12 +1458,100 @@ onBeforeUnmount(() => {
     font-family: var(--mono);
 }
 
+.tick-arrow {
+    font-size: 11px;
+    font-weight: 700;
+    font-family: var(--mono);
+}
+
+.tick-arrow.up {
+    color: #4ade80;
+}
+
+.tick-arrow.down {
+    color: #f87171;
+}
+
 .hero-price {
     display: flex;
     align-items: baseline;
     gap: 2px;
     line-height: 1;
     margin-bottom: 4px;
+    position: relative;
+    overflow: hidden;
+}
+
+.hero-price::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -80%;
+    width: 55%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
+    animation: priceShimmer 5s ease-in-out infinite;
+    pointer-events: none;
+}
+
+.app:not(.dark) .hero-price::after {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+}
+
+@keyframes priceShimmer {
+    0% {
+        left: -80%;
+    }
+
+    45%,
+    100% {
+        left: 130%;
+    }
+}
+
+/* ── Price tick flash ── */
+.price-tick-up .price-int,
+.price-tick-up .price-dec,
+.price-tick-up .price-dollar {
+    animation: tickUp 0.85s ease-out forwards;
+}
+
+.price-tick-down .price-int,
+.price-tick-down .price-dec,
+.price-tick-down .price-dollar {
+    animation: tickDown 0.85s ease-out forwards;
+}
+
+@keyframes tickUp {
+    0% {
+        color: var(--gold);
+    }
+
+    15% {
+        color: #4ade80;
+        text-shadow: 0 0 16px rgba(74, 222, 128, 0.7);
+    }
+
+    100% {
+        color: var(--gold);
+        text-shadow: none;
+    }
+}
+
+@keyframes tickDown {
+    0% {
+        color: var(--gold);
+    }
+
+    15% {
+        color: #f87171;
+        text-shadow: 0 0 16px rgba(248, 113, 113, 0.7);
+    }
+
+    100% {
+        color: var(--gold);
+        text-shadow: none;
+    }
 }
 
 .price-dollar {
@@ -2269,10 +2408,36 @@ onBeforeUnmount(() => {
 
 .kpi-gain .kpi-val {
     color: var(--gain);
+    animation: gainGlow 3.5s ease-in-out infinite;
 }
 
 .kpi-loss .kpi-val {
     color: var(--loss);
+    animation: lossGlow 3.5s ease-in-out infinite;
+}
+
+@keyframes gainGlow {
+
+    0%,
+    100% {
+        text-shadow: none;
+    }
+
+    50% {
+        text-shadow: 0 0 14px rgba(34, 197, 94, 0.5);
+    }
+}
+
+@keyframes lossGlow {
+
+    0%,
+    100% {
+        text-shadow: none;
+    }
+
+    50% {
+        text-shadow: 0 0 14px rgba(248, 113, 113, 0.5);
+    }
 }
 
 .portfolio-bar {
@@ -2291,10 +2456,36 @@ onBeforeUnmount(() => {
 
 .portfolio-fill.gain {
     background: var(--gain);
+    animation: barPulse 3.5s ease-in-out infinite;
 }
 
 .portfolio-fill.loss {
     background: var(--loss);
+    animation: barPulseLoss 3.5s ease-in-out infinite;
+}
+
+@keyframes barPulse {
+
+    0%,
+    100% {
+        filter: brightness(1);
+    }
+
+    50% {
+        filter: brightness(1.35);
+    }
+}
+
+@keyframes barPulseLoss {
+
+    0%,
+    100% {
+        filter: brightness(1);
+    }
+
+    50% {
+        filter: brightness(1.35);
+    }
 }
 
 .portfolio-pct {
@@ -2806,10 +2997,6 @@ onBeforeUnmount(() => {
 @media (min-width: 1100px) {
     .main {
         padding: 24px 24px 72px;
-    }
-
-    .desktop-nav {
-        display: flex;
     }
 
     .desktop-grid {
