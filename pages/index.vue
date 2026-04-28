@@ -1314,22 +1314,40 @@ onBeforeUnmount(() => {
 .sticky-price {
     position: fixed;
     top: 0;
-    left: 50%;
-    transform: translateX(-50%) translateY(-90px);
+    left: 0;
+    right: 0;
+    transform: translateY(-90px);
     z-index: 99;
     background: var(--surface);
-    border: 1px solid var(--gold-border);
-    border-radius: 0 0 18px 18px;
-    padding: 10px 22px;
+    border: none;
+    border-bottom: 1px solid var(--gold-border);
+    border-radius: 0;
+    padding: 10px 16px;
     display: flex;
     align-items: center;
     gap: 12px;
     transition: transform 0.55s cubic-bezier(0.34, 1.7, 0.64, 1);
-    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .sticky-price.visible {
-    transform: translateX(-50%) translateY(0);
+    transform: translateY(0);
+}
+
+@media (min-width: 640px) {
+    .sticky-price {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%) translateY(-90px);
+        border: 1px solid var(--gold-border);
+        border-radius: 0 0 18px 18px;
+        padding: 10px 22px;
+        box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
+    }
+
+    .sticky-price.visible {
+        transform: translateX(-50%) translateY(0);
+    }
 }
 
 .sticky-gem {
@@ -1396,6 +1414,7 @@ onBeforeUnmount(() => {
     font-size: 20px;
     padding: 4px;
     transition: color 0.2s;
+    margin-left: auto;
 }
 
 .sticky-refresh:hover {
