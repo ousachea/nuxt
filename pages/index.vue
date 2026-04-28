@@ -196,6 +196,12 @@
                                 <span class="conv-val">{{ convertUnit(convInput || 0, activeConv, u) }}</span>
                             </div>
                         </div>
+
+                        <!-- USD value of the converter amount -->
+                        <div v-if="goldPrice && convInput" class="conv-usd-row">
+                            <span class="conv-usd-label">≈ USD value</span>
+                            <span class="conv-usd-val">${{ convValueUSD.toFixed(2) }}</span>
+                        </div>
                     </section>
 
                 </div>
@@ -205,9 +211,20 @@
 
                     <!-- ── PRICE GRID ── -->
                     <section class="card">
-                        <h2 class="section-title">{{ t.priceByUnit }}</h2>
+                        <div class="section-header">
+                            <h2 class="section-title">{{ t.priceByUnit }}</h2>
+                            <span v-if="goldPrice && convInput && convInput !== 1" class="conv-qty-badge">
+                                × {{ convInput }} {{ t[activeConv] || activeConv }}
+                            </span>
+                        </div>
+                        <!-- Total value highlight when converter qty > 1 -->
+                        <div v-if="goldPrice && convInput && convInput !== 1 && convValueUSD" class="conv-total-tile">
+                            <span class="conv-total-label">Total value of {{ convInput }} {{ t[activeConv] || activeConv
+                                }}</span>
+                            <span class="conv-total-val">${{ convValueUSD.toFixed(2) }}</span>
+                        </div>
                         <div v-if="goldPrice" class="unit-grid">
-                            <div v-for="u in allUnits" :key="u.key" class="unit-tile">
+                            <div v-for="u in allUnitsScaled" :key="u.key" class="unit-tile">
                                 <div class="tile-top">
                                     <span class="tile-name">{{ t[u.key] || u.label }}</span>
                                     <span class="tile-gram">{{ u.gram }}</span>
@@ -683,6 +700,16 @@ const allUnits = computed(() => [
     { key: 'damlung', label: 'Damlung', price: pricePerGram.value * DAMLUNG, gram: '37.5g' },
     { key: 'troyOz', label: 'Troy Oz', price: goldPrice.value || 0, gram: '31.1g' },
 ])
+
+// Converter USD value + scaled price grid
+const convValueUSD = computed(() => {
+    if (!goldPrice.value || !convInput.value) return 0
+    const grams = toGrams(convInput.value, activeConv.value)
+    return pricePerGram.value * grams
+})
+
+// Price-by-unit grid — always per-unit prices (scaling shown via conv-usd-row)
+const allUnitsScaled = computed(() => allUnits.value)
 
 const totalInvested = computed(() => purchases.value.reduce((s, p) => s + p.price, 0))
 const totalCurrent = computed(() => purchases.value.reduce((s, p) => s + currentValue(p), 0))
@@ -2450,6 +2477,71 @@ onBeforeUnmount(() => {
     border-top: 1px solid var(--border);
 }
 
+/* ── Converter USD total ── */
+.conv-usd-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: var(--gold-alpha);
+    border: 1px solid var(--gold-border);
+    border-radius: 10px;
+}
+
+.conv-usd-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.conv-usd-val {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--gold);
+    font-family: var(--mono);
+}
+
+/* ── Qty badge on price grid ── */
+.conv-qty-badge {
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--gold-alpha);
+    border: 1px solid var(--gold-border);
+    color: var(--gold);
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    margin-bottom: 14px;
+}
+
+/* ── Total value tile in price grid ── */
+.conv-total-tile {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--gold-alpha);
+    border: 1px solid var(--gold-border);
+    border-radius: 12px;
+    margin-bottom: 10px;
+}
+
+.conv-total-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gold);
+}
+
+.conv-total-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--gold);
+    font-family: var(--mono);
+}
+
 /* ── Transitions ── */
 @keyframes priceFlipOut {
     to {
@@ -2687,11 +2779,7 @@ onBeforeUnmount(() => {
         grid-row: 1 / 3;
         position: sticky;
         top: 72px;
-        max-height: calc(100vh - 88px);
-        overflow-y: auto;
-        scrollbar-width: thin;
-        scrollbar-color: var(--border) transparent;
-        padding-right: 2px;
+        align-self: start;
     }
 
     .col-center {
@@ -2735,8 +2823,7 @@ onBeforeUnmount(() => {
         grid-row: 1;
         position: sticky;
         top: 72px;
-        max-height: calc(100vh - 88px);
-        overflow-y: auto;
+        align-self: start;
     }
 
     .col-center {
@@ -2749,8 +2836,7 @@ onBeforeUnmount(() => {
         grid-row: 1;
         position: sticky;
         top: 72px;
-        max-height: calc(100vh - 88px);
-        overflow-y: auto;
+        align-self: start;
     }
 
     .unit-grid {
