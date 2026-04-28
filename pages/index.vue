@@ -255,7 +255,12 @@
                                 <div class="burst-ring-wrap" :class="{ burst: pwUnlockBurst }">
                                     <div class="burst-r1"></div>
                                     <div class="burst-r2"></div>
-                                    <div class="pw-icon" :class="{ shake: pwShake }">🔒</div>
+                                    <div class="lock-ripple-wrap">
+                                        <div class="lock-ripple r1"></div>
+                                        <div class="lock-ripple r2"></div>
+                                        <div class="lock-ripple r3"></div>
+                                        <div class="pw-icon" :class="{ shake: pwShake }">🔒</div>
+                                    </div>
                                 </div>
                                 <p class="pw-title">{{ t.locked }}</p>
                                 <p class="pw-sub">{{ t.pwSub }}</p>
@@ -406,15 +411,15 @@
                         <div class="kpi-stack">
                             <div class="kpi-item">
                                 <span class="kpi-label">{{ t.totalInvested }}</span>
-                                <span class="kpi-val">${{ totalInvested.toFixed(2) }}</span>
+                                <span class="kpi-val">${{ displayInvested.toFixed(2) }}</span>
                             </div>
                             <div class="kpi-item" :class="totalGL >= 0 ? 'kpi-gain' : 'kpi-loss'">
                                 <span class="kpi-label">{{ t.currentValue }}</span>
-                                <span class="kpi-val">${{ totalCurrent.toFixed(2) }}</span>
+                                <span class="kpi-val">${{ displayCurrent.toFixed(2) }}</span>
                             </div>
                             <div class="kpi-item kpi-big" :class="totalGL >= 0 ? 'kpi-gain' : 'kpi-loss'">
                                 <span class="kpi-label">{{ t.totalGainLoss }}</span>
-                                <span class="kpi-val kpi-main">{{ totalGL >= 0 ? '+' : '' }}${{ totalGL.toFixed(2)
+                                <span class="kpi-val kpi-main">{{ displayGL >= 0 ? '+' : '' }}${{ displayGL.toFixed(2)
                                     }}</span>
                             </div>
                         </div>
@@ -449,7 +454,7 @@
                                 <span>G/L</span>
                             </div>
                             <div v-for="(p, i) in purchases" :key="p.id" class="ht-row"
-                                :class="gainLoss(p) >= 0 ? 'ht-gain' : 'ht-loss'">
+                                :class="[gainLoss(p) >= 0 ? 'ht-gain' : 'ht-loss', p.id === newestPurchaseId ? 'ht-row-flash' : '']">
                                 <span class="ht-weight">{{ p.weight }}<em>{{ t[p.unit] || p.unit }}</em></span>
                                 <span>${{ p.price.toFixed(0) }}</span>
                                 <span>${{ currentValue(p).toFixed(0) }}</span>
@@ -588,6 +593,36 @@ const pwError = ref('')
 const pwShake = ref(false)
 const pwUnlockBurst = ref(false)
 const purchasesGlow = ref(false)
+
+// ─── Portfolio count-up display values ───────────────────────────────────────
+const displayInvested = ref(0)
+const displayCurrent = ref(0)
+const displayGL = ref(0)
+const newestPurchaseId = ref(null)
+
+function animatePortfolio() {
+    const targets = {
+        invested: totalInvested.value,
+        current: totalCurrent.value,
+        gl: totalGL.value,
+    }
+    const duration = 1100
+    const startTime = performance.now()
+    function step(now) {
+        const t = Math.min((now - startTime) / duration, 1)
+        const ease = 1 - Math.pow(1 - t, 3)
+        displayInvested.value = targets.invested * ease
+        displayCurrent.value = targets.current * ease
+        displayGL.value = targets.gl * ease
+        if (t < 1) requestAnimationFrame(step)
+        else {
+            displayInvested.value = targets.invested
+            displayCurrent.value = targets.current
+            displayGL.value = targets.gl
+        }
+    }
+    requestAnimationFrame(step)
+}
 
 // ─── i18n ─────────────────────────────────────────────────────────────────────
 const translations = {
@@ -806,12 +841,14 @@ async function unlockPurchases() {
     setTimeout(() => pwUnlockBurst.value = false, 800)
     purchasesLocked.value = false
     pwInput.value = ''; pwError.value = ''
+    setTimeout(() => animatePortfolio(), 120)
 }
 
 function lockPurchases() {
     purchasesLocked.value = true
     isOwner.value = false
     purchases.value = []
+    displayInvested.value = 0; displayCurrent.value = 0; displayGL.value = 0
     pwInput.value = ''; pwError.value = ''
     sessionStorage.removeItem('gt4_ukey')
 }
@@ -875,10 +912,17 @@ async function fetchPrice() {
 // ─── Purchases ────────────────────────────────────────────────────────────────
 function addPurchase() {
     if (!draft.value.weight || !draft.value.price) { flash('Fill in weight and price', 'error'); return }
-    purchases.value.push({ ...draft.value, id: Date.now() })
+    const id = Date.now()
+    purchases.value.push({ ...draft.value, id })
+    newestPurchaseId.value = id
+    setTimeout(() => { newestPurchaseId.value = null }, 1400)
     draft.value = { weight: '', unit: 'chi', price: '', date: today() }
     showForm.value = false
     save()
+    // Update display values immediately after adding
+    displayInvested.value = totalInvested.value
+    displayCurrent.value = totalCurrent.value
+    displayGL.value = totalGL.value
 }
 
 function startEdit(i) { editIdx.value = i; editDraft.value = { ...purchases.value[i] } }
@@ -1280,7 +1324,7 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     gap: 12px;
-    transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: transform 0.55s cubic-bezier(0.34, 1.7, 0.64, 1);
     box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
 }
 
@@ -2143,6 +2187,60 @@ onBeforeUnmount(() => {
     color: var(--loss);
     text-align: center;
     font-weight: 500;
+}
+
+/* ── Lock ripple rings ── */
+.lock-ripple-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 52px;
+}
+
+.lock-ripple {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1.5px solid var(--gold);
+    opacity: 0;
+    animation: lockRipple 2.8s ease-out infinite;
+}
+
+.lock-ripple.r2 {
+    animation-delay: 0.9s;
+}
+
+.lock-ripple.r3 {
+    animation-delay: 1.8s;
+}
+
+@keyframes lockRipple {
+    0% {
+        transform: scale(0.7);
+        opacity: 0.65;
+    }
+
+    100% {
+        transform: scale(2.4);
+        opacity: 0;
+    }
+}
+
+/* ── Holdings row flash ── */
+@keyframes rowFlash {
+    0% {
+        background: rgba(34, 197, 94, 0.28);
+    }
+
+    100% {
+        background: transparent;
+    }
+}
+
+.ht-row-flash {
+    animation: rowFlash 1.4s ease-out forwards;
 }
 
 /* ── Add purchase ── */
