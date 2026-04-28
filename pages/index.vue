@@ -1175,7 +1175,7 @@ onBeforeUnmount(() => {
 .app:not(.dark) .header { background: rgba(244, 241, 235, 0.92); }
 
 .header-inner {
-  max-width: 1400px;
+  max-width: 2200px;
   margin: 0 auto;
   padding: 10px 24px;
   display: flex;
@@ -1286,7 +1286,7 @@ onBeforeUnmount(() => {
 .main {
   position: relative;
   z-index: 1;
-  max-width: 1400px;
+  max-width: 2200px;
   margin: 0 auto;
   padding: 16px 16px 72px;
 }
@@ -1905,8 +1905,85 @@ onBeforeUnmount(() => {
 
 /* Wide desktop: expand center */
 @media (min-width: 1280px) {
-  .desktop-grid { grid-template-columns: 300px 1fr 280px; }
+  .desktop-grid { grid-template-columns: 320px 1fr 300px; gap: 16px; }
   .purchases-list { grid-template-columns: repeat(2, 1fr); }
+  .unit-grid { grid-template-columns: repeat(6, 1fr); }
+  .chips-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Large desktop: 27" / 1440p */
+@media (min-width: 1600px) {
+  .main { padding: 28px 32px 72px; }
+  .header-inner { max-width: 1800px; padding: 12px 32px; }
+
+  .desktop-grid {
+    grid-template-columns: 360px 1fr 320px;
+    gap: 20px;
+    max-width: 1800px;
+    margin: 0 auto;
+  }
+
+  /* Bigger price */
+  .price-int { font-size: 68px; letter-spacing: -3px; }
+  .price-dollar { font-size: 32px; }
+  .price-dec { font-size: 26px; }
+
+  /* Wider cards */
+  .card { padding: 24px 22px; border-radius: 22px; }
+
+  /* 3-col purchases on large screens */
+  .purchases-list { grid-template-columns: repeat(3, 1fr); }
+
+  /* Unit grid full row */
+  .unit-grid { grid-template-columns: repeat(6, 1fr); }
+  .chips-grid { grid-template-columns: repeat(3, 1fr); }
+
+  /* Bigger KPI */
+  .kpi-val { font-size: 22px; }
+  .kpi-main { font-size: 28px; }
+  .kpi-item { padding: 16px 18px; }
+  .kpi-item.kpi-big { padding: 20px 18px; }
+
+  /* Taller sparkline */
+  .sparkline { height: 52px; }
+
+  /* Holdings table more comfortable */
+  .ht-row { padding: 11px 16px; font-size: 13px; }
+  .ht-header { padding: 10px 16px; }
+}
+
+/* 4K / ultra-wide: 27" 4K or 32" */
+@media (min-width: 2000px) {
+  .main { padding: 32px 40px 72px; }
+  .header-inner { max-width: 2200px; padding: 14px 40px; }
+
+  .desktop-grid {
+    grid-template-columns: 400px 1fr 380px;
+    gap: 24px;
+    max-width: 2200px;
+  }
+
+  .price-int { font-size: 80px; letter-spacing: -4px; }
+  .price-dollar { font-size: 38px; }
+  .price-dec { font-size: 30px; }
+
+  .card { padding: 28px 26px; border-radius: 24px; }
+  .section-title { font-size: 15px; margin-bottom: 18px; }
+
+  .purchases-list { grid-template-columns: repeat(3, 1fr); }
+  .unit-grid { grid-template-columns: repeat(6, 1fr); }
+  .chips-grid { grid-template-columns: repeat(3, 1fr); }
+
+  .kpi-val { font-size: 26px; }
+  .kpi-main { font-size: 34px; }
+  .kpi-item { padding: 20px 22px; }
+
+  .conv-row { padding: 13px 18px; }
+  .conv-label { font-size: 15px; }
+  .conv-val { font-size: 15px; }
+
+  .sparkline { height: 64px; }
+  .ht-row { padding: 13px 18px; font-size: 14px; }
 }
 
 /* Safe area */
