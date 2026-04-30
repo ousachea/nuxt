@@ -579,9 +579,10 @@ const PRE_PURCHASES = [
     { id: 'pre_3', weight: 1, unit: 'chi', price: 590, date: '2024-01-01' },
     { id: 'pre_4', weight: 1, unit: 'chi', price: 505, date: '2024-01-01' },
     { id: 'pre_5', weight: 3, unit: 'chi', price: 1440, date: '2024-01-01' },
-    { id: 'pre_6', weight: 2, unit: 'chi', price: 1030, date: '2024-01-01' },
-    { id: 'pre_7', weight: 5, unit: 'chi', price: 2000, date: '2024-01-01' },
-    { id: 'pre_8', weight: 10, unit: 'chi', price: 4900, date: '2024-01-01' },
+    { id: 'pre_6', weight: 2, unit: 'chi', price: 1110, date: '2024-01-01' },
+    { id: 'pre_7', weight: 2, unit: 'chi', price: 1030, date: '2024-01-01' },
+    { id: 'pre_8', weight: 5, unit: 'chi', price: 2000, date: '2024-01-01' },
+    { id: 'pre_9', weight: 10, unit: 'chi', price: 4900, date: '2024-01-01' },
 ]
 
 // ─── State ────────────────────────────────────────────────────────────────────
