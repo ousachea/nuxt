@@ -21,6 +21,41 @@
             </div>
         </transition>
 
+        <!-- Password Modal -->
+        <transition name="fade">
+            <div v-if="showPwModal" class="pw-modal-backdrop" @click.self="showPwModal = false">
+                <div class="pw-modal">
+                    <div class="pw-modal-header">
+                        <span class="pw-modal-title">{{ isOwner ? '🔓 Owner View Active' : '🔒 Owner Unlock' }}</span>
+                        <button class="pw-modal-close" @click="showPwModal = false">✕</button>
+                    </div>
+                    <template v-if="!isOwner">
+                        <p class="pw-modal-sub">Enter your password to load owner purchases.</p>
+                        <div class="burst-ring-wrap" :class="{ burst: pwUnlockBurst }" style="margin: 8px auto;">
+                            <div class="burst-r1"></div>
+                            <div class="burst-r2"></div>
+                            <div class="lock-ripple-wrap">
+                                <div class="lock-ripple r1"></div>
+                                <div class="lock-ripple r2"></div>
+                                <div class="lock-ripple r3"></div>
+                                <div class="pw-icon" :class="{ shake: pwShake }">🔒</div>
+                            </div>
+                        </div>
+                        <input v-model="pwInput" class="text-input" type="password" :placeholder="t.enterPw"
+                            @keyup.enter="unlockFromModal" autocomplete="current-password" />
+                        <transition name="fade">
+                            <p v-if="pwError" class="pw-error">{{ pwError }}</p>
+                        </transition>
+                        <button class="primary-btn full-btn" style="margin-top:8px;" @click="unlockFromModal">{{ t.unlock }}</button>
+                    </template>
+                    <template v-else>
+                        <p class="pw-modal-sub">You are viewing owner purchases.</p>
+                        <button class="ghost-btn full-btn" style="margin-top:8px;" @click="lockFromModal">🔒 Lock &amp; clear owner data</button>
+                    </template>
+                </div>
+            </div>
+        </transition>
+
         <!-- Ambient Background -->
         <div class="ambient" aria-hidden="true">
             <div class="orb orb-1" />
@@ -46,6 +81,10 @@
                     <button class="ctrl-btn lang-btn" @click="toggleLang"
                         :aria-label="lang === 'en' ? 'Switch to Khmer' : 'Switch to English'">
                         {{ lang === 'en' ? 'ខ្មែរ' : 'EN' }}
+                    </button>
+                    <button class="ctrl-btn lock-nav-btn" @click="openPwModal"
+                        :aria-label="isOwner ? 'Owner active' : 'Unlock owner view'">
+                        {{ isOwner ? '🔓' : '🔒' }}
                     </button>
                 </div>
             </div>
@@ -291,42 +330,14 @@
                         <div class="section-header">
                             <h2 class="section-title">{{ t.myPurchases }}</h2>
                             <div class="section-actions">
-                                <template v-if="!purchasesLocked">
-                                    <button class="ghost-btn" @click="exportCSV">↓ CSV</button>
-                                    <button class="ghost-btn" @click="csvInput.click()">↑ CSV</button>
-                                    <button class="ghost-btn lock-btn" @click="lockPurchases"
-                                        :title="t.lock">🔒</button>
-                                </template>
+                                <button class="ghost-btn" @click="exportCSV">↓ CSV</button>
+                                <button class="ghost-btn" @click="csvInput.click()">↑ CSV</button>
                                 <input ref="csvInput" type="file" accept=".csv" hidden @change="importCSV" />
                             </div>
                         </div>
 
-                        <!-- ── PASSWORD GATE ── -->
-                        <div v-if="purchasesLocked" class="pw-gate">
-                            <div class="pw-box">
-                                <div class="burst-ring-wrap" :class="{ burst: pwUnlockBurst }">
-                                    <div class="burst-r1"></div>
-                                    <div class="burst-r2"></div>
-                                    <div class="lock-ripple-wrap">
-                                        <div class="lock-ripple r1"></div>
-                                        <div class="lock-ripple r2"></div>
-                                        <div class="lock-ripple r3"></div>
-                                        <div class="pw-icon" :class="{ shake: pwShake }">🔒</div>
-                                    </div>
-                                </div>
-                                <p class="pw-title">{{ t.locked }}</p>
-                                <p class="pw-sub">{{ t.pwSub }}</p>
-                                <input v-model="pwInput" class="text-input" type="password" :placeholder="t.enterPw"
-                                    @keyup.enter="unlockPurchases" autocomplete="current-password" />
-                                <transition name="fade">
-                                    <p v-if="pwError" class="pw-error">{{ pwError }}</p>
-                                </transition>
-                                <button class="primary-btn full-btn" @click="unlockPurchases">{{ t.unlock }}</button>
-                            </div>
-                        </div>
-
-                        <!-- ── PURCHASES CONTENT (unlocked) ── -->
-                        <template v-else>
+                        <!-- ── PURCHASES CONTENT ── -->
+                        <div>
                             <!-- FAB-style Add Button -->
                             <button class="add-purchase-btn" @click="showForm = !showForm">
                                 <span class="add-icon">{{ showForm ? '✕' : '+' }}</span>
@@ -464,7 +475,7 @@
                                 </svg>
                                 <p>{{ t.noPurchases }}</p>
                             </div>
-                        </template>
+                        </div>
                     </section>
                 </div>
 
@@ -472,7 +483,7 @@
                 <div class="col-right">
 
                     <!-- Portfolio KPI Cards -->
-                    <section class="card summary-card" v-if="!purchasesLocked && purchases.length">
+                    <section class="card summary-card" v-if="purchases.length">
                         <div class="card-accent" />
                         <h2 class="section-title">{{ t.portfolioSummary }}</h2>
 
@@ -501,18 +512,8 @@
                         </div>
                     </section>
 
-                    <!-- Placeholder when locked -->
-                    <section class="card summary-card summary-locked" v-else-if="purchasesLocked">
-                        <div class="card-accent" />
-                        <h2 class="section-title">{{ t.portfolioSummary }}</h2>
-                        <div class="locked-placeholder">
-                            <span class="locked-icon">🔒</span>
-                            <p>Unlock purchases to see portfolio summary</p>
-                        </div>
-                    </section>
-
                     <!-- Per-purchase breakdown table -->
-                    <section class="card" v-if="!purchasesLocked && purchases.length && displayPrice">
+                    <section class="card" v-if="purchases.length && displayPrice">
                         <h2 class="section-title">Holdings</h2>
                         <div class="holdings-table">
                             <div class="ht-header">
@@ -612,11 +613,10 @@ const csvInput = ref(null)
 
 // ─── Animation State ──────────────────────────────────────────────────────────
 const animatedPrice = ref(null)
-const priceTickDir = ref(null)   // 'up' | 'down' | null
+const priceTickDir = ref(null)
 let priceSimTimer = null
 let rafId = null
 
-// rAF-based counter — no setInterval, returns promise that resolves when done
 function animateCounterTo(target, duration = 900) {
     if (rafId) cancelAnimationFrame(rafId)
     const start = animatedPrice.value || target
@@ -634,7 +634,6 @@ function animateCounterTo(target, duration = 900) {
 }
 
 // ─── Price Simulation ─────────────────────────────────────────────────────────
-// Sim only moves animatedPrice for display — goldPrice (real) is never touched
 let simRunning = false
 
 function startPriceSim() {
@@ -643,7 +642,7 @@ function startPriceSim() {
     async function tick() {
         if (!simRunning || !goldPrice.value || loading.value || priceSource.value !== 'api') return
         const delta = (Math.random() * 5) * (Math.random() < 0.5 ? 1 : -1)
-        const display = goldPrice.value + delta           // always off real, never accumulates
+        const display = goldPrice.value + delta
         priceTickDir.value = delta > 0 ? 'up' : 'down'
         if (typeof navigator.vibrate === 'function') navigator.vibrate(12)
         await animateCounterTo(display, 800)
@@ -692,8 +691,8 @@ const sparklineColor = computed(() => {
 })
 
 // ─── Password State ───────────────────────────────────────────────────────────
-const purchasesLocked = ref(true)
 const isOwner = ref(false)
+const showPwModal = ref(false)
 const pwInput = ref('')
 const pwError = ref('')
 const pwShake = ref(false)
@@ -780,9 +779,9 @@ const translations = {
         noPurchases: 'No purchases yet. Tap + Add above.',
         lock: 'Lock purchases',
         locked: 'Enter password to view purchases',
-        pwSub: 'Use your own password to see your purchases, or the shared password to see shared purchases.',
+        pwSub: 'Enter your owner password to load pre-loaded purchases.',
         unlock: 'Unlock',
-        enterPw: 'Enter any password…',
+        enterPw: 'Enter password…',
     },
     km: {
         title: 'តាមដានមាស',
@@ -832,7 +831,7 @@ const translations = {
         noPurchases: 'មិនទាន់មានការទិញ។ ចុច + បន្ថែម',
         lock: 'ចាក់សោ',
         locked: 'បញ្ចូលពាក្យសម្ងាត់ដើម្បីមើលការទិញ',
-        pwSub: 'ប្រើពាក្យសម្ងាត់របស់អ្នក ឬពាក្យសម្ងាត់រួម។',
+        pwSub: 'បញ្ចូលពាក្យសម្ងាត់ម្ចាស់ដើម្បីមើលការទិញ។',
         unlock: 'ដោះសោ',
         enterPw: 'បញ្ចូលពាក្យសម្ងាត់…',
     }
@@ -842,7 +841,6 @@ const t = computed(() => translations[lang.value])
 // ─── Price computations ───────────────────────────────────────────────────────
 const pricePerGram = computed(() => displayPrice.value ? displayPrice.value / TROY : 0)
 
-// displayPrice: animatedPrice during sim ticks, real goldPrice otherwise
 const displayPrice = computed(() => animatedPrice.value ?? goldPrice.value)
 const priceUnits = computed(() => [
     { key: 'li', label: 'Li', price: renderedPPG.value * LI },
@@ -861,14 +859,12 @@ const allUnits = computed(() => [
     { key: 'troyOz', label: 'Troy Oz', price: renderedPrice.value || 0, gram: '31.1g' },
 ])
 
-// Converter USD value + scaled price grid
 const convValueUSD = computed(() => {
     if (!displayPrice.value || !convInput.value) return 0
     const grams = toGrams(convInput.value, activeConv.value)
     return pricePerGram.value * grams
 })
 
-// Price-by-unit grid — always per-unit prices (scaling shown via conv-usd-row)
 const allUnitsScaled = computed(() => allUnits.value)
 
 const totalInvested = computed(() => purchases.value.reduce((s, p) => s + p.price, 0))
@@ -925,7 +921,13 @@ async function sha256(str) {
     return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-async function unlockPurchases() {
+function openPwModal() {
+    showPwModal.value = true
+    pwInput.value = ''
+    pwError.value = ''
+}
+
+async function unlockFromModal() {
     if (!pwInput.value) {
         pwError.value = 'Enter a password'
         pwShake.value = false
@@ -934,32 +936,33 @@ async function unlockPurchases() {
         return
     }
     const hash = await sha256(pwInput.value)
-
     if (hash === OWNER_PW_HASH) {
         isOwner.value = true
         const extra = JSON.parse(localStorage.getItem('gt4_owner_extra') || '[]')
-        purchases.value = [...PRE_PURCHASES, ...extra]
+        // merge: keep any user-added purchases, prepend PRE_PURCHASES
+        const existingIds = new Set(PRE_PURCHASES.map(p => p.id))
+        const userAdded = purchases.value.filter(p => !existingIds.has(p.id))
+        purchases.value = [...PRE_PURCHASES, ...extra, ...userAdded]
+        pwUnlockBurst.value = true
+        setTimeout(() => pwUnlockBurst.value = false, 800)
+        pwInput.value = ''; pwError.value = ''
+        showPwModal.value = false
+        setTimeout(() => animatePortfolio(), 120)
     } else {
-        isOwner.value = false
-        const userKey = 'gt4_u_' + hash.slice(0, 16)
-        sessionStorage.setItem('gt4_ukey', userKey)
-        purchases.value = JSON.parse(localStorage.getItem(userKey) || '[]')
+        pwError.value = 'Incorrect password'
+        pwShake.value = false
+        await nextTick(); pwShake.value = true
+        setTimeout(() => pwShake.value = false, 600)
     }
-
-    pwUnlockBurst.value = true
-    setTimeout(() => pwUnlockBurst.value = false, 800)
-    purchasesLocked.value = false
-    pwInput.value = ''; pwError.value = ''
-    setTimeout(() => animatePortfolio(), 120)
 }
 
-function lockPurchases() {
-    purchasesLocked.value = true
+function lockFromModal() {
     isOwner.value = false
-    purchases.value = []
-    displayInvested.value = 0; displayCurrent.value = 0; displayGL.value = 0
-    pwInput.value = ''; pwError.value = ''
-    sessionStorage.removeItem('gt4_ukey')
+    // remove PRE_PURCHASES, keep only user-added
+    const existingIds = new Set(PRE_PURCHASES.map(p => p.id))
+    purchases.value = purchases.value.filter(p => !existingIds.has(p.id))
+    showPwModal.value = false
+    save()
 }
 
 function scrollToPurchases() {
@@ -1029,7 +1032,6 @@ function addPurchase() {
     draft.value = { weight: '', unit: 'chi', price: '', date: today() }
     showForm.value = false
     save()
-    // Update display values immediately after adding
     displayInvested.value = totalInvested.value
     displayCurrent.value = totalCurrent.value
     displayGL.value = totalGL.value
@@ -1113,13 +1115,12 @@ function stopIdleWatch() {
 watch(screensaver, v => { v ? startSSClock() : stopSSClock() })
 
 watch(displayPrice, () => {
-  if (!purchasesLocked.value && purchases.value.length) {
-    displayInvested.value = totalInvested.value
-    displayCurrent.value = totalCurrent.value
-    displayGL.value = totalGL.value
-  }
+    if (purchases.value.length) {
+        displayInvested.value = totalInvested.value
+        displayCurrent.value = totalCurrent.value
+        displayGL.value = totalGL.value
+    }
 })
-
 
 // screensaver clock
 let ssClockTimer = null
@@ -1129,12 +1130,9 @@ function startSSClock() {
 }
 function stopSSClock() { clearTimeout(ssClockTimer) }
 
-// ─── Smooth per-unit prices (chips, tiles, qref, sticky) ─────────────────────
-// We run a single shared rAF loop that tracks displayPrice and smoothly
-// interpolates a "renderedPrice" which all secondary displays read from.
+// ─── Smooth per-unit prices ───────────────────────────────────────────────────
 const renderedPrice = ref(null)
 let renderRafId = null
-let renderTarget = null
 
 function startPriceRenderLoop() {
     function loop() {
@@ -1145,15 +1143,15 @@ function startPriceRenderLoop() {
         if (Math.abs(diff) < 0.005) {
             renderedPrice.value = target
         } else {
-            renderedPrice.value += diff * 0.12   // smooth follow factor
+            renderedPrice.value += diff * 0.12
         }
         renderRafId = requestAnimationFrame(loop)
     }
     renderRafId = requestAnimationFrame(loop)
 }
 
-// Computed per-gram from renderedPrice so chips/tiles all follow smoothly
 const renderedPPG = computed(() => renderedPrice.value ? renderedPrice.value / TROY : 0)
+
 function save() {
     try {
         localStorage.setItem('gt4', JSON.stringify({
@@ -1162,17 +1160,17 @@ function save() {
             customPrice: customPrice.value, customApiUrl: customApiUrl.value,
             priceSource: priceSource.value,
         }))
-        if (!purchasesLocked.value) {
-            if (isOwner.value) {
-                const extra = purchases.value.filter(p => !PRE_PURCHASES.find(pp => pp.id === p.id))
-                localStorage.setItem('gt4_owner_extra', JSON.stringify(extra))
-            } else {
-                const userKey = sessionStorage.getItem('gt4_ukey')
-                if (userKey) localStorage.setItem(userKey, JSON.stringify(purchases.value))
-            }
+        if (isOwner.value) {
+            const extra = purchases.value.filter(p => !PRE_PURCHASES.find(pp => pp.id === p.id))
+            localStorage.setItem('gt4_owner_extra', JSON.stringify(extra))
+        } else {
+            const userKey = sessionStorage.getItem('gt4_ukey')
+            if (userKey) localStorage.setItem(userKey, JSON.stringify(purchases.value))
+            else localStorage.setItem('gt4_user_purchases', JSON.stringify(purchases.value))
         }
     } catch { }
 }
+
 function load() { try { return JSON.parse(localStorage.getItem('gt4') || 'null') } catch { return null } }
 
 function handleOnline() { isOnline.value = true; fetchPrice() }
@@ -1188,7 +1186,11 @@ onMounted(() => {
         customPrice.value = d.customPrice || null; customApiUrl.value = d.customApiUrl || ''
         priceSource.value = d.priceSource || 'api'
     }
-    purchasesLocked.value = true
+    // Load user's own purchases (non-owner) on start
+    try {
+        const saved = JSON.parse(localStorage.getItem('gt4_user_purchases') || '[]')
+        purchases.value = saved
+    } catch { }
     loadHistory()
     if (priceSource.value === 'api') fetchPrice()
     window.addEventListener('online', handleOnline)
@@ -1277,7 +1279,6 @@ onBeforeUnmount(() => {
     overflow-x: hidden;
 }
 
-/* ── Empty state SVG ── */
 .empty-svg {
     width: 64px;
     height: 64px;
@@ -1306,13 +1307,8 @@ onBeforeUnmount(() => {
 }
 
 @keyframes ssDrift {
-    from {
-        transform: translate(0, 0);
-    }
-
-    to {
-        transform: translate(12px, -16px);
-    }
+    from { transform: translate(0, 0); }
+    to { transform: translate(12px, -16px); }
 }
 
 .ss-gem {
@@ -1454,64 +1450,25 @@ onBeforeUnmount(() => {
     animation: orbDrift3 24s ease-in-out infinite alternate;
 }
 
-.app:not(.dark) .orb {
-    opacity: 0.07;
-}
+.app:not(.dark) .orb { opacity: 0.07; }
 
 @keyframes orbDrift1 {
-    0% {
-        transform: translate(0, 0) scale(1);
-        opacity: 0.13;
-    }
-
-    33% {
-        transform: translate(-18px, 24px) scale(1.06);
-        opacity: 0.17;
-    }
-
-    66% {
-        transform: translate(12px, 10px) scale(0.96);
-        opacity: 0.11;
-    }
-
-    100% {
-        transform: translate(24px, 36px) scale(1.1);
-        opacity: 0.15;
-    }
+    0% { transform: translate(0, 0) scale(1); opacity: 0.13; }
+    33% { transform: translate(-18px, 24px) scale(1.06); opacity: 0.17; }
+    66% { transform: translate(12px, 10px) scale(0.96); opacity: 0.11; }
+    100% { transform: translate(24px, 36px) scale(1.1); opacity: 0.15; }
 }
 
 @keyframes orbDrift2 {
-    0% {
-        transform: translate(0, 0) scale(1);
-        opacity: 0.13;
-    }
-
-    50% {
-        transform: translate(20px, -16px) scale(1.08);
-        opacity: 0.17;
-    }
-
-    100% {
-        transform: translate(-10px, 30px) scale(0.94);
-        opacity: 0.10;
-    }
+    0% { transform: translate(0, 0) scale(1); opacity: 0.13; }
+    50% { transform: translate(20px, -16px) scale(1.08); opacity: 0.17; }
+    100% { transform: translate(-10px, 30px) scale(0.94); opacity: 0.10; }
 }
 
 @keyframes orbDrift3 {
-    0% {
-        transform: translate(0, 0) scale(1);
-        opacity: 0.13;
-    }
-
-    40% {
-        transform: translate(-14px, 20px) scale(1.12);
-        opacity: 0.18;
-    }
-
-    100% {
-        transform: translate(18px, -12px) scale(0.92);
-        opacity: 0.09;
-    }
+    0% { transform: translate(0, 0) scale(1); opacity: 0.13; }
+    40% { transform: translate(-14px, 20px) scale(1.12); opacity: 0.18; }
+    100% { transform: translate(18px, -12px) scale(0.92); opacity: 0.09; }
 }
 
 /* ── Header ── */
@@ -1525,9 +1482,7 @@ onBeforeUnmount(() => {
     border-bottom: 1px solid var(--border);
 }
 
-.app:not(.dark) .header {
-    background: rgba(244, 241, 235, 0.92);
-}
+.app:not(.dark) .header { background: rgba(244, 241, 235, 0.92); }
 
 .header-inner {
     max-width: 2200px;
@@ -1557,23 +1512,11 @@ onBeforeUnmount(() => {
 }
 
 @keyframes gemPulse {
-
-    0%,
-    100% {
-        transform: scale(1) rotate(0deg);
-        filter: drop-shadow(0 0 0px transparent);
-    }
-
-    50% {
-        transform: scale(1.15) rotate(45deg);
-        filter: drop-shadow(0 0 6px rgba(245, 200, 66, 0.55));
-    }
+    0%, 100% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 0px transparent); }
+    50% { transform: scale(1.15) rotate(45deg); filter: drop-shadow(0 0 6px rgba(245, 200, 66, 0.55)); }
 }
 
-.logo-text {
-    display: flex;
-    flex-direction: column;
-}
+.logo-text { display: flex; flex-direction: column; }
 
 .logo-title {
     font-size: 17px;
@@ -1588,7 +1531,6 @@ onBeforeUnmount(() => {
     letter-spacing: 0.05em;
     margin-top: 1px;
 }
-
 
 .header-controls {
     display: flex;
@@ -1622,6 +1564,8 @@ onBeforeUnmount(() => {
     min-width: unset;
 }
 
+.lock-nav-btn { font-size: 16px; }
+
 .offline-bar {
     text-align: center;
     padding: 8px;
@@ -1630,6 +1574,71 @@ onBeforeUnmount(() => {
     background: var(--gold-alpha);
     color: var(--gold);
     border-top: 1px solid var(--gold-border);
+}
+
+/* ── Password Modal ── */
+.pw-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.pw-modal {
+    background: var(--surface);
+    border: 1px solid var(--border-hi);
+    border-radius: var(--radius-lg);
+    padding: 24px 20px;
+    width: 100%;
+    max-width: 360px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.pw-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pw-modal-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.pw-modal-close {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.pw-modal-close:hover {
+    border-color: var(--loss-border);
+    color: var(--loss);
+}
+
+.pw-modal-sub {
+    font-size: 13px;
+    color: var(--text-2);
+    line-height: 1.5;
 }
 
 /* ── Sticky Price ── */
@@ -1652,9 +1661,7 @@ onBeforeUnmount(() => {
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
-.sticky-price.visible {
-    transform: translateY(0);
-}
+.sticky-price.visible { transform: translateY(0); }
 
 @media (min-width: 640px) {
     .sticky-price {
@@ -1666,10 +1673,7 @@ onBeforeUnmount(() => {
         padding: 10px 22px;
         box-shadow: 0 6px 28px rgba(0, 0, 0, 0.35);
     }
-
-    .sticky-price.visible {
-        transform: translateX(-50%) translateY(0);
-    }
+    .sticky-price.visible { transform: translateX(-50%) translateY(0); }
 }
 
 .sticky-gem {
@@ -1678,23 +1682,9 @@ onBeforeUnmount(() => {
     flex-shrink: 0;
 }
 
-.sticky-prices {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-}
-
-.sticky-row-main {
-    display: flex;
-    align-items: baseline;
-    gap: 4px;
-}
-
-.sticky-row-sub {
-    display: flex;
-    align-items: baseline;
-    gap: 4px;
-}
+.sticky-prices { display: flex; flex-direction: column; gap: 1px; }
+.sticky-row-main { display: flex; align-items: baseline; gap: 4px; }
+.sticky-row-sub { display: flex; align-items: baseline; gap: 4px; }
 
 .sticky-val {
     font-size: 22px;
@@ -1704,10 +1694,7 @@ onBeforeUnmount(() => {
     letter-spacing: -0.5px;
 }
 
-.sticky-unit {
-    font-size: 12px;
-    color: var(--text-3);
-}
+.sticky-unit { font-size: 12px; color: var(--text-3); }
 
 .sticky-val-sub {
     font-size: 14px;
@@ -1716,10 +1703,7 @@ onBeforeUnmount(() => {
     font-family: var(--mono);
 }
 
-.sticky-unit-sub {
-    font-size: 11px;
-    color: var(--text-3);
-}
+.sticky-unit-sub { font-size: 11px; color: var(--text-3); }
 
 .sticky-divider {
     width: 1px;
@@ -1739,9 +1723,7 @@ onBeforeUnmount(() => {
     margin-left: auto;
 }
 
-.sticky-refresh:hover {
-    color: var(--gold);
-}
+.sticky-refresh:hover { color: var(--gold); }
 
 /* ── Main layout ── */
 .main {
@@ -1752,7 +1734,6 @@ onBeforeUnmount(() => {
     padding: 16px 16px 72px;
 }
 
-/* Mobile: single stacked column */
 .desktop-grid {
     display: flex;
     flex-direction: column;
@@ -1819,9 +1800,7 @@ onBeforeUnmount(() => {
 }
 
 /* ── Hero Price ── */
-.hero-price-block {
-    margin-bottom: 14px;
-}
+.hero-price-block { margin-bottom: 14px; }
 
 .hero-meta-row {
     display: flex;
@@ -1849,13 +1828,8 @@ onBeforeUnmount(() => {
     font-family: var(--mono);
 }
 
-.tick-arrow.up {
-    color: #4ade80;
-}
-
-.tick-arrow.down {
-    color: #f87171;
-}
+.tick-arrow.up { color: #4ade80; }
+.tick-arrow.down { color: #f87171; }
 
 .hero-price {
     display: flex;
@@ -1884,59 +1858,28 @@ onBeforeUnmount(() => {
 }
 
 @keyframes priceShimmer {
-    0% {
-        left: -80%;
-    }
-
-    45%,
-    100% {
-        left: 130%;
-    }
+    0% { left: -80%; }
+    45%, 100% { left: 130%; }
 }
 
-/* ── Price tick flash ── */
 .price-tick-up .price-int,
 .price-tick-up .price-dec,
-.price-tick-up .price-dollar {
-    animation: tickUp 0.85s ease-out forwards;
-}
+.price-tick-up .price-dollar { animation: tickUp 0.85s ease-out forwards; }
 
 .price-tick-down .price-int,
 .price-tick-down .price-dec,
-.price-tick-down .price-dollar {
-    animation: tickDown 0.85s ease-out forwards;
-}
+.price-tick-down .price-dollar { animation: tickDown 0.85s ease-out forwards; }
 
 @keyframes tickUp {
-    0% {
-        color: var(--gold);
-    }
-
-    15% {
-        color: #4ade80;
-        text-shadow: 0 0 16px rgba(74, 222, 128, 0.7);
-    }
-
-    100% {
-        color: var(--gold);
-        text-shadow: none;
-    }
+    0% { color: var(--gold); }
+    15% { color: #4ade80; text-shadow: 0 0 16px rgba(74, 222, 128, 0.7); }
+    100% { color: var(--gold); text-shadow: none; }
 }
 
 @keyframes tickDown {
-    0% {
-        color: var(--gold);
-    }
-
-    15% {
-        color: #f87171;
-        text-shadow: 0 0 16px rgba(248, 113, 113, 0.7);
-    }
-
-    100% {
-        color: var(--gold);
-        text-shadow: none;
-    }
+    0% { color: var(--gold); }
+    15% { color: #f87171; text-shadow: 0 0 16px rgba(248, 113, 113, 0.7); }
+    100% { color: var(--gold); text-shadow: none; }
 }
 
 .price-dollar {
@@ -1967,7 +1910,6 @@ onBeforeUnmount(() => {
     font-family: var(--mono);
 }
 
-/* ── Chips: scrollable on mobile, grid on desktop ── */
 .chips-scroll {
     display: flex;
     gap: 6px;
@@ -1977,9 +1919,7 @@ onBeforeUnmount(() => {
     padding: 2px 0 10px;
 }
 
-.chips-scroll::-webkit-scrollbar {
-    display: none;
-}
+.chips-scroll::-webkit-scrollbar { display: none; }
 
 .chips-grid {
     display: grid;
@@ -2029,17 +1969,9 @@ onBeforeUnmount(() => {
 }
 
 @keyframes progress {
-    0% {
-        transform: translateX(-100%) scaleX(0.4);
-    }
-
-    50% {
-        transform: translateX(60%) scaleX(0.8);
-    }
-
-    100% {
-        transform: translateX(200%) scaleX(0.4);
-    }
+    0% { transform: translateX(-100%) scaleX(0.4); }
+    50% { transform: translateX(60%) scaleX(0.8); }
+    100% { transform: translateX(200%) scaleX(0.4); }
 }
 
 .flash {
@@ -2099,10 +2031,7 @@ onBeforeUnmount(() => {
     border-radius: 6px;
 }
 
-.api-hint-text {
-    font-size: 12px;
-    color: var(--text-3);
-}
+.api-hint-text { font-size: 12px; color: var(--text-3); }
 
 .api-key-row {
     display: flex;
@@ -2116,14 +2045,8 @@ onBeforeUnmount(() => {
     line-height: 1.5;
 }
 
-.api-hint a {
-    color: var(--gold);
-    text-decoration: none;
-}
-
-.api-hint a:hover {
-    text-decoration: underline;
-}
+.api-hint a { color: var(--gold); text-decoration: none; }
+.api-hint a:hover { text-decoration: underline; }
 
 .method-tabs {
     display: flex;
@@ -2151,9 +2074,7 @@ onBeforeUnmount(() => {
     color: var(--gold);
 }
 
-.price-input-row {
-    display: flex;
-}
+.price-input-row { display: flex; }
 
 .input-prefix {
     background: var(--surface3);
@@ -2169,9 +2090,7 @@ onBeforeUnmount(() => {
     flex-shrink: 0;
 }
 
-.price-input {
-    border-radius: 0 10px 10px 0 !important;
-}
+.price-input { border-radius: 0 10px 10px 0 !important; }
 
 /* ── Inputs / Buttons ── */
 .text-input {
@@ -2189,14 +2108,8 @@ onBeforeUnmount(() => {
     appearance: none;
 }
 
-.text-input:focus {
-    outline: none;
-    border-color: var(--gold-border);
-}
-
-.text-input::placeholder {
-    color: var(--text-3);
-}
+.text-input:focus { outline: none; border-color: var(--gold-border); }
+.text-input::placeholder { color: var(--text-3); }
 
 .primary-btn {
     display: inline-flex;
@@ -2216,28 +2129,13 @@ onBeforeUnmount(() => {
     white-space: nowrap;
 }
 
-.primary-btn:hover:not(:disabled) {
-    filter: brightness(1.08);
-    transform: translateY(-1px);
-}
+.primary-btn:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.primary-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
+.app:not(.dark) .primary-btn { color: #fff; background: var(--gold-dim); }
 
-.app:not(.dark) .primary-btn {
-    color: #fff;
-    background: var(--gold-dim);
-}
-
-.refresh-btn {
-    flex-shrink: 0;
-}
-
-.full-btn {
-    width: 100%;
-}
+.refresh-btn { flex-shrink: 0; }
+.full-btn { width: 100%; }
 
 .ghost-btn {
     display: inline-flex;
@@ -2256,10 +2154,7 @@ onBeforeUnmount(() => {
     transition: all 0.2s;
 }
 
-.ghost-btn:hover {
-    border-color: var(--border-hi);
-    color: var(--text);
-}
+.ghost-btn:hover { border-color: var(--border-hi); color: var(--text); }
 
 .icon-btn-sm {
     background: var(--surface2);
@@ -2277,24 +2172,15 @@ onBeforeUnmount(() => {
     flex-shrink: 0;
 }
 
-.icon-btn-sm:hover {
-    border-color: var(--gold-border);
-}
-
-.icon-btn-sm.danger:hover {
-    border-color: var(--loss-border);
-}
+.icon-btn-sm:hover { border-color: var(--gold-border); }
+.icon-btn-sm.danger:hover { border-color: var(--loss-border); }
 
 .spin {
     display: inline-block;
     animation: spin 1s linear infinite;
 }
 
-@keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Section titles ── */
 .section-title {
@@ -2305,11 +2191,7 @@ onBeforeUnmount(() => {
     margin-bottom: 14px;
 }
 
-.section-title::before {
-    content: '◈ ';
-    color: var(--gold);
-    font-size: 10px;
-}
+.section-title::before { content: '◈ '; color: var(--gold); font-size: 10px; }
 
 .section-header {
     display: flex;
@@ -2320,19 +2202,12 @@ onBeforeUnmount(() => {
     flex-wrap: wrap;
 }
 
-.section-header .section-title {
-    margin-bottom: 0;
-}
+.section-header .section-title { margin-bottom: 0; }
 
 .section-actions {
     display: flex;
     gap: 6px;
     align-items: center;
-}
-
-.lock-btn {
-    padding: 8px 10px;
-    font-size: 14px;
 }
 
 /* ── Converter ── */
@@ -2346,9 +2221,7 @@ onBeforeUnmount(() => {
     margin-bottom: 12px;
 }
 
-.conv-tabs-scroll::-webkit-scrollbar {
-    display: none;
-}
+.conv-tabs-scroll::-webkit-scrollbar { display: none; }
 
 .conv-tab {
     padding: 8px 12px;
@@ -2414,22 +2287,9 @@ onBeforeUnmount(() => {
     gap: 8px;
 }
 
-.conv-row:last-child {
-    border-bottom: none;
-}
-
-.conv-label {
-    font-size: 13px;
-    color: var(--text-2);
-    font-weight: 500;
-}
-
-.conv-val {
-    font-size: 13px;
-    font-family: var(--mono);
-    font-weight: 600;
-    color: var(--text);
-}
+.conv-row:last-child { border-bottom: none; }
+.conv-label { font-size: 13px; color: var(--text-2); font-weight: 500; }
+.conv-val { font-size: 13px; font-family: var(--mono); font-weight: 600; color: var(--text); }
 
 /* ── Unit grid ── */
 .unit-grid {
@@ -2449,9 +2309,7 @@ onBeforeUnmount(() => {
     transition: border-color 0.2s;
 }
 
-.unit-tile:hover {
-    border-color: var(--gold-border);
-}
+.unit-tile:hover { border-color: var(--gold-border); }
 
 .tile-top {
     display: flex;
@@ -2467,11 +2325,7 @@ onBeforeUnmount(() => {
     letter-spacing: 0.06em;
 }
 
-.tile-gram {
-    font-size: 10px;
-    color: var(--text-3);
-    font-family: var(--mono);
-}
+.tile-gram { font-size: 10px; color: var(--text-3); font-family: var(--mono); }
 
 .tile-price {
     font-size: 14px;
@@ -2484,42 +2338,10 @@ onBeforeUnmount(() => {
     white-space: nowrap;
 }
 
-/* ── Password Gate ── */
-.pw-gate {
-    display: flex;
-    justify-content: center;
-    padding: 16px 0 8px;
-}
-
-.pw-box {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    width: 100%;
-    max-width: 340px;
-    align-items: stretch;
-}
-
+/* ── Password gate remnants (modal reuses these) ── */
 .pw-icon {
     font-size: 32px;
     text-align: center;
-    margin-bottom: 4px;
-}
-
-.pw-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--text);
-    text-align: center;
-    margin-bottom: 4px;
-    line-height: 1.4;
-}
-
-.pw-sub {
-    font-size: 12px;
-    color: var(--text-3);
-    text-align: center;
-    line-height: 1.5;
     margin-bottom: 4px;
 }
 
@@ -2549,40 +2371,21 @@ onBeforeUnmount(() => {
     animation: lockRipple 2.8s ease-out infinite;
 }
 
-.lock-ripple.r2 {
-    animation-delay: 0.9s;
-}
-
-.lock-ripple.r3 {
-    animation-delay: 1.8s;
-}
+.lock-ripple.r2 { animation-delay: 0.9s; }
+.lock-ripple.r3 { animation-delay: 1.8s; }
 
 @keyframes lockRipple {
-    0% {
-        transform: scale(0.7);
-        opacity: 0.65;
-    }
-
-    100% {
-        transform: scale(2.4);
-        opacity: 0;
-    }
+    0% { transform: scale(0.7); opacity: 0.65; }
+    100% { transform: scale(2.4); opacity: 0; }
 }
 
 /* ── Holdings row flash ── */
 @keyframes rowFlash {
-    0% {
-        background: rgba(34, 197, 94, 0.28);
-    }
-
-    100% {
-        background: transparent;
-    }
+    0% { background: rgba(34, 197, 94, 0.28); }
+    100% { background: transparent; }
 }
 
-.ht-row-flash {
-    animation: rowFlash 1.4s ease-out forwards;
-}
+.ht-row-flash { animation: rowFlash 1.4s ease-out forwards; }
 
 /* ── Add purchase ── */
 .add-purchase-btn {
@@ -2610,10 +2413,7 @@ onBeforeUnmount(() => {
     background: var(--gold-alpha);
 }
 
-.add-icon {
-    font-size: 20px;
-    line-height: 1;
-}
+.add-icon { font-size: 20px; line-height: 1; }
 
 .purchase-form {
     background: var(--surface2);
@@ -2683,23 +2483,9 @@ onBeforeUnmount(() => {
     font-variant-numeric: tabular-nums;
 }
 
-.pcard-unit {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-2);
-}
-
-.pcard-date {
-    font-size: 11px;
-    color: var(--text-3);
-    font-family: var(--mono);
-}
-
-.pcard-btns {
-    display: flex;
-    gap: 6px;
-    flex-shrink: 0;
-}
+.pcard-unit { font-size: 12px; font-weight: 600; color: var(--text-2); }
+.pcard-date { font-size: 11px; color: var(--text-3); font-family: var(--mono); }
+.pcard-btns { display: flex; gap: 6px; flex-shrink: 0; }
 
 .pcard-btn {
     background: var(--surface3);
@@ -2716,20 +2502,10 @@ onBeforeUnmount(() => {
     justify-content: center;
 }
 
-.pcard-btn:hover {
-    border-color: var(--gold-border);
-    color: var(--gold);
-}
+.pcard-btn:hover { border-color: var(--gold-border); color: var(--gold); }
+.pcard-btn.danger:hover { border-color: var(--loss-border); color: var(--loss); }
 
-.pcard-btn.danger:hover {
-    border-color: var(--loss-border);
-    color: var(--loss);
-}
-
-.gl-row {
-    display: flex;
-    align-items: stretch;
-}
+.gl-row { display: flex; align-items: stretch; }
 
 .gl-col {
     flex: 1;
@@ -2739,13 +2515,8 @@ onBeforeUnmount(() => {
     padding: 0 4px;
 }
 
-.gl-col:first-child {
-    padding-left: 0;
-}
-
-.gl-col:last-child {
-    padding-right: 0;
-}
+.gl-col:first-child { padding-left: 0; }
+.gl-col:last-child { padding-right: 0; }
 
 .gl-divider {
     width: 1px;
@@ -2762,35 +2533,14 @@ onBeforeUnmount(() => {
     letter-spacing: 0.05em;
 }
 
-.gl-val {
-    font-size: 12px;
-    font-weight: 700;
-    font-family: var(--mono);
-    color: var(--text);
-}
+.gl-val { font-size: 12px; font-weight: 700; font-family: var(--mono); color: var(--text); }
+.gl-main { font-size: 13px; }
+.gain-text { color: var(--gain) !important; }
+.loss-text { color: var(--loss) !important; }
+.edit-actions { display: flex; gap: 8px; }
 
-.gl-main {
-    font-size: 13px;
-}
-
-.gain-text {
-    color: var(--gain) !important;
-}
-
-.loss-text {
-    color: var(--loss) !important;
-}
-
-.edit-actions {
-    display: flex;
-    gap: 8px;
-}
-
-/* ── Portfolio / KPI (right col) ── */
-.summary-card {
-    position: relative;
-    overflow: hidden;
-}
+/* ── Portfolio / KPI ── */
+.summary-card { position: relative; overflow: hidden; }
 
 .kpi-stack {
     display: flex;
@@ -2809,21 +2559,9 @@ onBeforeUnmount(() => {
     padding: 12px 14px;
 }
 
-.kpi-item.kpi-gain {
-    background: var(--gain-bg);
-    border-color: var(--gain-border);
-    border-left: 3px solid var(--gain);
-}
-
-.kpi-item.kpi-loss {
-    background: var(--loss-bg);
-    border-color: var(--loss-border);
-    border-left: 3px solid var(--loss);
-}
-
-.kpi-item.kpi-big {
-    padding: 16px 14px;
-}
+.kpi-item.kpi-gain { background: var(--gain-bg); border-color: var(--gain-border); border-left: 3px solid var(--gain); }
+.kpi-item.kpi-loss { background: var(--loss-bg); border-color: var(--loss-border); border-left: 3px solid var(--loss); }
+.kpi-item.kpi-big { padding: 16px 14px; }
 
 .kpi-label {
     font-size: 11px;
@@ -2841,42 +2579,19 @@ onBeforeUnmount(() => {
     font-variant-numeric: tabular-nums;
 }
 
-.kpi-main {
-    font-size: 22px;
-}
+.kpi-main { font-size: 22px; }
 
-.kpi-gain .kpi-val {
-    color: var(--gain);
-    animation: gainGlow 3.5s ease-in-out infinite;
-}
-
-.kpi-loss .kpi-val {
-    color: var(--loss);
-    animation: lossGlow 3.5s ease-in-out infinite;
-}
+.kpi-gain .kpi-val { color: var(--gain); animation: gainGlow 3.5s ease-in-out infinite; }
+.kpi-loss .kpi-val { color: var(--loss); animation: lossGlow 3.5s ease-in-out infinite; }
 
 @keyframes gainGlow {
-
-    0%,
-    100% {
-        text-shadow: none;
-    }
-
-    50% {
-        text-shadow: 0 0 14px rgba(34, 197, 94, 0.5);
-    }
+    0%, 100% { text-shadow: none; }
+    50% { text-shadow: 0 0 14px rgba(34, 197, 94, 0.5); }
 }
 
 @keyframes lossGlow {
-
-    0%,
-    100% {
-        text-shadow: none;
-    }
-
-    50% {
-        text-shadow: 0 0 14px rgba(248, 113, 113, 0.5);
-    }
+    0%, 100% { text-shadow: none; }
+    50% { text-shadow: 0 0 14px rgba(248, 113, 113, 0.5); }
 }
 
 .portfolio-bar {
@@ -2887,83 +2602,23 @@ onBeforeUnmount(() => {
     margin-bottom: 6px;
 }
 
-.portfolio-fill {
-    height: 100%;
-    border-radius: 3px;
-    transition: width 0.6s ease;
-}
-
-.portfolio-fill.gain {
-    background: var(--gain);
-    animation: barPulse 3.5s ease-in-out infinite;
-}
-
-.portfolio-fill.loss {
-    background: var(--loss);
-    animation: barPulseLoss 3.5s ease-in-out infinite;
-}
+.portfolio-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+.portfolio-fill.gain { background: var(--gain); animation: barPulse 3.5s ease-in-out infinite; }
+.portfolio-fill.loss { background: var(--loss); animation: barPulseLoss 3.5s ease-in-out infinite; }
 
 @keyframes barPulse {
-
-    0%,
-    100% {
-        filter: brightness(1);
-    }
-
-    50% {
-        filter: brightness(1.35);
-    }
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.35); }
 }
 
 @keyframes barPulseLoss {
-
-    0%,
-    100% {
-        filter: brightness(1);
-    }
-
-    50% {
-        filter: brightness(1.35);
-    }
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.35); }
 }
 
-.portfolio-pct {
-    font-size: 12px;
-    font-weight: 700;
-    text-align: right;
-    font-family: var(--mono);
-}
-
-.portfolio-pct.gain {
-    color: var(--gain);
-}
-
-.portfolio-pct.loss {
-    color: var(--loss);
-}
-
-/* ── Locked placeholder ── */
-.locked-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    padding: 24px 16px;
-    background: var(--surface2);
-    border-radius: 12px;
-    border: 1.5px dashed var(--border);
-}
-
-.locked-icon {
-    font-size: 28px;
-    color: var(--text-3);
-}
-
-.locked-placeholder p {
-    font-size: 12px;
-    color: var(--text-3);
-    text-align: center;
-}
+.portfolio-pct { font-size: 12px; font-weight: 700; text-align: right; font-family: var(--mono); }
+.portfolio-pct.gain { color: var(--gain); }
+.portfolio-pct.loss { color: var(--loss); }
 
 /* ── Holdings table ── */
 .holdings-table {
@@ -3003,33 +2658,12 @@ onBeforeUnmount(() => {
     transition: background 0.15s;
 }
 
-.ht-row:last-child {
-    border-bottom: none;
-}
-
-.ht-row:hover {
-    background: var(--surface3);
-}
-
-.ht-weight {
-    font-weight: 700;
-    color: var(--text);
-}
-
-.ht-weight em {
-    font-style: normal;
-    font-size: 10px;
-    color: var(--text-3);
-    margin-left: 2px;
-}
-
-.ht-gain {
-    border-left: 2px solid var(--gain);
-}
-
-.ht-loss {
-    border-left: 2px solid var(--loss);
-}
+.ht-row:last-child { border-bottom: none; }
+.ht-row:hover { background: var(--surface3); }
+.ht-weight { font-weight: 700; color: var(--text); }
+.ht-weight em { font-style: normal; font-size: 10px; color: var(--text-3); margin-left: 2px; }
+.ht-gain { border-left: 2px solid var(--gain); }
+.ht-loss { border-left: 2px solid var(--loss); }
 
 /* ── Quick Reference ── */
 .qref-list {
@@ -3050,28 +2684,10 @@ onBeforeUnmount(() => {
     border-bottom: 1px solid var(--border);
 }
 
-.qref-row:last-child {
-    border-bottom: none;
-}
-
-.qref-label {
-    font-size: 13px;
-    color: var(--text-2);
-    font-weight: 500;
-}
-
-.qref-val {
-    font-size: 13px;
-    font-family: var(--mono);
-    font-weight: 700;
-    color: var(--gold);
-}
-
-.qref-divider {
-    height: 1px;
-    background: var(--border-hi);
-    margin: 0;
-}
+.qref-row:last-child { border-bottom: none; }
+.qref-label { font-size: 13px; color: var(--text-2); font-weight: 500; }
+.qref-val { font-size: 13px; font-family: var(--mono); font-weight: 700; color: var(--gold); }
+.qref-divider { height: 1px; background: var(--border-hi); margin: 0; }
 
 /* ── Empty state ── */
 .empty-state {
@@ -3085,17 +2701,8 @@ onBeforeUnmount(() => {
     border: 1.5px dashed var(--border);
 }
 
-.empty-icon {
-    font-size: 24px;
-    color: var(--text-3);
-}
-
-.empty-state p {
-    font-size: 13px;
-    color: var(--text-2);
-    font-weight: 500;
-    text-align: center;
-}
+.empty-icon { font-size: 24px; color: var(--text-3); }
+.empty-state p { font-size: 13px; color: var(--text-2); font-weight: 500; text-align: center; }
 
 /* ── Footer ── */
 .footer {
@@ -3108,15 +2715,8 @@ onBeforeUnmount(() => {
 }
 
 /* ── Sparkline ── */
-.sparkline-wrap {
-    margin-top: 10px;
-}
-
-.sparkline {
-    width: 100%;
-    height: 40px;
-    display: block;
-}
+.sparkline-wrap { margin-top: 10px; }
+.sparkline { width: 100%; height: 40px; display: block; }
 
 .sparkline-meta {
     display: flex;
@@ -3126,16 +2726,8 @@ onBeforeUnmount(() => {
 }
 
 .sparkline-low,
-.sparkline-high {
-    font-size: 10px;
-    font-family: var(--mono);
-    color: var(--text-3);
-}
-
-.sparkline-label {
-    font-size: 10px;
-    color: var(--text-3);
-}
+.sparkline-high { font-size: 10px; font-family: var(--mono); color: var(--text-3); }
+.sparkline-label { font-size: 10px; color: var(--text-3); }
 
 /* ── Today chip ── */
 .today-chip {
@@ -3153,9 +2745,7 @@ onBeforeUnmount(() => {
     transition: background 0.15s;
 }
 
-.today-chip:hover {
-    background: rgba(245, 200, 66, 0.2);
-}
+.today-chip:hover { background: rgba(245, 200, 66, 0.2); }
 
 .conv-usd-row {
     display: flex;
@@ -3176,14 +2766,8 @@ onBeforeUnmount(() => {
     letter-spacing: 0.06em;
 }
 
-.conv-usd-val {
-    font-size: 16px;
-    font-weight: 800;
-    color: var(--gold);
-    font-family: var(--mono);
-}
+.conv-usd-val { font-size: 16px; font-weight: 800; color: var(--gold); font-family: var(--mono); }
 
-/* ── Qty badge on price grid ── */
 .conv-qty-badge {
     font-size: 11px;
     font-weight: 700;
@@ -3196,7 +2780,6 @@ onBeforeUnmount(() => {
     margin-bottom: 14px;
 }
 
-/* ── Total value tile in price grid ── */
 .conv-total-tile {
     display: flex;
     justify-content: space-between;
@@ -3208,90 +2791,44 @@ onBeforeUnmount(() => {
     margin-bottom: 10px;
 }
 
-.conv-total-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--gold);
-}
-
-.conv-total-val {
-    font-size: 20px;
-    font-weight: 800;
-    color: var(--gold);
-    font-family: var(--mono);
-}
+.conv-total-label { font-size: 12px; font-weight: 600; color: var(--gold); }
+.conv-total-val { font-size: 20px; font-weight: 800; color: var(--gold); font-family: var(--mono); }
 
 /* ── Transitions ── */
 @keyframes priceFlipOut {
-    to {
-        opacity: 0;
-        transform: translateY(10px) rotateX(20deg);
-    }
+    to { opacity: 0; transform: translateY(10px) rotateX(20deg); }
 }
 
 @keyframes priceFlipIn {
-    from {
-        opacity: 0;
-        transform: translateY(-10px) rotateX(-20deg);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0) rotateX(0);
-    }
+    from { opacity: 0; transform: translateY(-10px) rotateX(-20deg); }
+    to { opacity: 1; transform: translateY(0) rotateX(0); }
 }
 
-.price-flip-leave-active {
-    animation: priceFlipOut 0.18s ease-in forwards;
-}
-
-.price-flip-enter-active {
-    animation: priceFlipIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
+.price-flip-leave-active { animation: priceFlipOut 0.18s ease-in forwards; }
+.price-flip-enter-active { animation: priceFlipIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
 .fade-enter-active,
-.fade-leave-active {
-    transition: opacity 0.3s;
-}
+.fade-leave-active { transition: opacity 0.3s; }
 
 .fade-enter-from,
-.fade-leave-to {
-    opacity: 0;
-}
+.fade-leave-to { opacity: 0; }
 
 .slide-down-enter-active,
-.slide-down-leave-active {
-    transition: all 0.3s ease;
-    overflow: hidden;
-}
+.slide-down-leave-active { transition: all 0.3s ease; overflow: hidden; }
 
 .slide-down-enter-from,
-.slide-down-leave-to {
-    opacity: 0;
-    transform: translateY(-10px);
-    max-height: 0;
-}
+.slide-down-leave-to { opacity: 0; transform: translateY(-10px); max-height: 0; }
 
 .slide-down-enter-to,
-.slide-down-leave-from {
-    max-height: 700px;
-}
+.slide-down-leave-from { max-height: 700px; }
 
-/* ── Chip shimmer animation ── */
+/* ── Chip shimmer ── */
 @keyframes shimmerSwipe {
-    0% {
-        transform: translateX(-100%);
-    }
-
-    100% {
-        transform: translateX(300%);
-    }
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(300%); }
 }
 
-.chip-shimmer {
-    position: relative;
-    overflow: hidden;
-}
+.chip-shimmer { position: relative; overflow: hidden; }
 
 .chip-shimmer .shimmer-line {
     position: absolute;
@@ -3306,15 +2843,8 @@ onBeforeUnmount(() => {
 
 /* ── Card stagger ── */
 @keyframes cardSlideIn {
-    from {
-        opacity: 0;
-        transform: translateY(16px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .p-card-stagger {
@@ -3324,64 +2854,26 @@ onBeforeUnmount(() => {
 
 /* ── Lock shake ── */
 @keyframes lockShake {
-
-    0%,
-    100% {
-        transform: translateX(0);
-    }
-
-    15% {
-        transform: translateX(-7px);
-    }
-
-    30% {
-        transform: translateX(7px);
-    }
-
-    45% {
-        transform: translateX(-5px);
-    }
-
-    60% {
-        transform: translateX(5px);
-    }
-
-    75% {
-        transform: translateX(-3px);
-    }
-
-    90% {
-        transform: translateX(3px);
-    }
+    0%, 100% { transform: translateX(0); }
+    15% { transform: translateX(-7px); }
+    30% { transform: translateX(7px); }
+    45% { transform: translateX(-5px); }
+    60% { transform: translateX(5px); }
+    75% { transform: translateX(-3px); }
+    90% { transform: translateX(3px); }
 }
 
-.pw-icon.shake {
-    animation: lockShake 0.5s ease;
-}
+.pw-icon.shake { animation: lockShake 0.5s ease; }
 
 /* ── Unlock burst ── */
 @keyframes burstRing {
-    0% {
-        transform: scale(0.5);
-        opacity: 0.9;
-    }
-
-    100% {
-        transform: scale(2.4);
-        opacity: 0;
-    }
+    0% { transform: scale(0.5); opacity: 0.9; }
+    100% { transform: scale(2.4); opacity: 0; }
 }
 
 @keyframes burstRing2 {
-    0% {
-        transform: scale(0.5);
-        opacity: 0.6;
-    }
-
-    100% {
-        transform: scale(1.9);
-        opacity: 0;
-    }
+    0% { transform: scale(0.5); opacity: 0.6; }
+    100% { transform: scale(1.9); opacity: 0; }
 }
 
 .burst-ring-wrap {
@@ -3402,48 +2894,25 @@ onBeforeUnmount(() => {
     pointer-events: none;
 }
 
-.burst-r2 {
-    width: 40px;
-    height: 40px;
-    border-color: rgba(245, 200, 66, 0.5);
-}
-
-.burst-ring-wrap.burst .burst-r1 {
-    animation: burstRing 0.65s ease-out forwards;
-}
-
-.burst-ring-wrap.burst .burst-r2 {
-    animation: burstRing2 0.55s ease-out 0.1s forwards;
-}
+.burst-r2 { width: 40px; height: 40px; border-color: rgba(245, 200, 66, 0.5); }
+.burst-ring-wrap.burst .burst-r1 { animation: burstRing 0.65s ease-out forwards; }
+.burst-ring-wrap.burst .burst-r2 { animation: burstRing2 0.55s ease-out 0.1s forwards; }
 
 /* ── Section glow ── */
 @keyframes sectionGlow {
-    0% {
-        box-shadow: 0 0 0 0 rgba(245, 200, 66, 0);
-    }
-
-    30% {
-        box-shadow: 0 0 0 8px rgba(245, 200, 66, 0.2);
-    }
-
-    100% {
-        box-shadow: 0 0 0 0 rgba(245, 200, 66, 0);
-    }
+    0% { box-shadow: 0 0 0 0 rgba(245, 200, 66, 0); }
+    30% { box-shadow: 0 0 0 8px rgba(245, 200, 66, 0.2); }
+    100% { box-shadow: 0 0 0 0 rgba(245, 200, 66, 0); }
 }
 
-.section-glow {
-    animation: sectionGlow 0.9s ease-out forwards;
-}
+.section-glow { animation: sectionGlow 0.9s ease-out forwards; }
 
 /* ══════════════════════════════════════════════════════════════════════════ */
 /* DESKTOP BREAKPOINTS                                                       */
 /* ══════════════════════════════════════════════════════════════════════════ */
 
-/* Tablet: 2 columns */
 @media (min-width: 768px) {
-    .main {
-        padding: 20px 20px 72px;
-    }
+    .main { padding: 20px 20px 72px; }
 
     .desktop-grid {
         display: grid;
@@ -3453,39 +2922,15 @@ onBeforeUnmount(() => {
         align-items: start;
     }
 
-    .col-left {
-        grid-column: 1;
-        grid-row: 1 / 3;
-        position: sticky;
-        top: 72px;
-        align-self: start;
-    }
-
-    .col-center {
-        grid-column: 2;
-        grid-row: 1;
-    }
-
-    .col-right {
-        grid-column: 2;
-        grid-row: 2;
-    }
-
-    .unit-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-
-    .purchases-list {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-    }
+    .col-left { grid-column: 1; grid-row: 1 / 3; position: sticky; top: 72px; align-self: start; }
+    .col-center { grid-column: 2; grid-row: 1; }
+    .col-right { grid-column: 2; grid-row: 2; }
+    .unit-grid { grid-template-columns: repeat(3, 1fr); }
+    .purchases-list { display: grid; grid-template-columns: repeat(2, 1fr); }
 }
 
-/* Full desktop: 3 columns */
 @media (min-width: 1100px) {
-    .main {
-        padding: 24px 24px 72px;
-    }
+    .main { padding: 24px 24px 72px; }
 
     .desktop-grid {
         grid-template-columns: 280px 1fr 260px;
@@ -3493,76 +2938,25 @@ onBeforeUnmount(() => {
         gap: 14px;
     }
 
-    .col-left {
-        grid-column: 1;
-        grid-row: 1;
-        position: sticky;
-        top: 72px;
-        align-self: start;
-    }
-
-    .col-center {
-        grid-column: 2;
-        grid-row: 1;
-    }
-
-    .col-right {
-        grid-column: 3;
-        grid-row: 1;
-        position: sticky;
-        top: 72px;
-        align-self: start;
-    }
-
-    .unit-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-
-    .purchases-list {
-        display: grid;
-        grid-template-columns: 1fr;
-    }
-
-    /* Larger price on desktop */
-    .price-int {
-        font-size: 52px;
-    }
-
-    .chips-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
+    .col-left { grid-column: 1; grid-row: 1; position: sticky; top: 72px; align-self: start; }
+    .col-center { grid-column: 2; grid-row: 1; }
+    .col-right { grid-column: 3; grid-row: 1; position: sticky; top: 72px; align-self: start; }
+    .unit-grid { grid-template-columns: repeat(3, 1fr); }
+    .purchases-list { display: grid; grid-template-columns: 1fr; }
+    .price-int { font-size: 52px; }
+    .chips-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
-/* Wide desktop: expand center */
 @media (min-width: 1280px) {
-    .desktop-grid {
-        grid-template-columns: 320px 1fr 300px;
-        gap: 16px;
-    }
-
-    .purchases-list {
-        grid-template-columns: repeat(2, 1fr);
-    }
-
-    .unit-grid {
-        grid-template-columns: repeat(6, 1fr);
-    }
-
-    .chips-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
+    .desktop-grid { grid-template-columns: 320px 1fr 300px; gap: 16px; }
+    .purchases-list { grid-template-columns: repeat(2, 1fr); }
+    .unit-grid { grid-template-columns: repeat(6, 1fr); }
+    .chips-grid { grid-template-columns: repeat(3, 1fr); }
 }
 
-/* Large desktop: 27" / 1440p */
 @media (min-width: 1600px) {
-    .main {
-        padding: 28px 32px 72px;
-    }
-
-    .header-inner {
-        max-width: 1800px;
-        padding: 12px 32px;
-    }
+    .main { padding: 28px 32px 72px; }
+    .header-inner { max-width: 1800px; padding: 12px 32px; }
 
     .desktop-grid {
         grid-template-columns: 360px 1fr 320px;
@@ -3571,83 +2965,25 @@ onBeforeUnmount(() => {
         margin: 0 auto;
     }
 
-    /* Bigger price */
-    .price-int {
-        font-size: 68px;
-        letter-spacing: -3px;
-    }
-
-    .price-dollar {
-        font-size: 32px;
-    }
-
-    .price-dec {
-        font-size: 26px;
-    }
-
-    /* Wider cards */
-    .card {
-        padding: 24px 22px;
-        border-radius: 22px;
-    }
-
-    /* 3-col purchases on large screens */
-    .purchases-list {
-        grid-template-columns: repeat(3, 1fr);
-    }
-
-    /* Unit grid full row */
-    .unit-grid {
-        grid-template-columns: repeat(6, 1fr);
-    }
-
-    .chips-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-
-    /* Bigger KPI */
-    .kpi-val {
-        font-size: 22px;
-    }
-
-    .kpi-main {
-        font-size: 28px;
-    }
-
-    .kpi-item {
-        padding: 16px 18px;
-    }
-
-    .kpi-item.kpi-big {
-        padding: 20px 18px;
-    }
-
-    /* Taller sparkline */
-    .sparkline {
-        height: 52px;
-    }
-
-    /* Holdings table more comfortable */
-    .ht-row {
-        padding: 11px 16px;
-        font-size: 13px;
-    }
-
-    .ht-header {
-        padding: 10px 16px;
-    }
+    .price-int { font-size: 68px; letter-spacing: -3px; }
+    .price-dollar { font-size: 32px; }
+    .price-dec { font-size: 26px; }
+    .card { padding: 24px 22px; border-radius: 22px; }
+    .purchases-list { grid-template-columns: repeat(3, 1fr); }
+    .unit-grid { grid-template-columns: repeat(6, 1fr); }
+    .chips-grid { grid-template-columns: repeat(3, 1fr); }
+    .kpi-val { font-size: 22px; }
+    .kpi-main { font-size: 28px; }
+    .kpi-item { padding: 16px 18px; }
+    .kpi-item.kpi-big { padding: 20px 18px; }
+    .sparkline { height: 52px; }
+    .ht-row { padding: 11px 16px; font-size: 13px; }
+    .ht-header { padding: 10px 16px; }
 }
 
-/* 4K / ultra-wide: 27" 4K or 32" */
 @media (min-width: 2000px) {
-    .main {
-        padding: 32px 40px 72px;
-    }
-
-    .header-inner {
-        max-width: 2200px;
-        padding: 14px 40px;
-    }
+    .main { padding: 32px 40px 72px; }
+    .header-inner { max-width: 2200px; padding: 14px 40px; }
 
     .desktop-grid {
         grid-template-columns: 400px 1fr 380px;
@@ -3655,83 +2991,26 @@ onBeforeUnmount(() => {
         max-width: 2200px;
     }
 
-    .price-int {
-        font-size: 80px;
-        letter-spacing: -4px;
-    }
-
-    .price-dollar {
-        font-size: 38px;
-    }
-
-    .price-dec {
-        font-size: 30px;
-    }
-
-    .card {
-        padding: 28px 26px;
-        border-radius: 24px;
-    }
-
-    .section-title {
-        font-size: 15px;
-        margin-bottom: 18px;
-    }
-
-    .purchases-list {
-        grid-template-columns: repeat(3, 1fr);
-    }
-
-    .unit-grid {
-        grid-template-columns: repeat(6, 1fr);
-    }
-
-    .chips-grid {
-        grid-template-columns: repeat(3, 1fr);
-    }
-
-    .kpi-val {
-        font-size: 26px;
-    }
-
-    .kpi-main {
-        font-size: 34px;
-    }
-
-    .kpi-item {
-        padding: 20px 22px;
-    }
-
-    .conv-row {
-        padding: 13px 18px;
-    }
-
-    .conv-label {
-        font-size: 15px;
-    }
-
-    .conv-val {
-        font-size: 15px;
-    }
-
-    .sparkline {
-        height: 64px;
-    }
-
-    .ht-row {
-        padding: 13px 18px;
-        font-size: 14px;
-    }
+    .price-int { font-size: 80px; letter-spacing: -4px; }
+    .price-dollar { font-size: 38px; }
+    .price-dec { font-size: 30px; }
+    .card { padding: 28px 26px; border-radius: 24px; }
+    .section-title { font-size: 15px; margin-bottom: 18px; }
+    .purchases-list { grid-template-columns: repeat(3, 1fr); }
+    .unit-grid { grid-template-columns: repeat(6, 1fr); }
+    .chips-grid { grid-template-columns: repeat(3, 1fr); }
+    .kpi-val { font-size: 26px; }
+    .kpi-main { font-size: 34px; }
+    .kpi-item { padding: 20px 22px; }
+    .conv-row { padding: 13px 18px; }
+    .conv-label { font-size: 15px; }
+    .conv-val { font-size: 15px; }
+    .sparkline { height: 64px; }
+    .ht-row { padding: 13px 18px; font-size: 14px; }
 }
 
-/* Safe area */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
-    .main {
-        padding-bottom: calc(72px + env(safe-area-inset-bottom));
-    }
-
-    .header {
-        padding-top: env(safe-area-inset-top);
-    }
+    .main { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+    .header { padding-top: env(safe-area-inset-top); }
 }
 </style>
