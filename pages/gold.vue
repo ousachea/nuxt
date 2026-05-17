@@ -1112,6 +1112,15 @@ function stopIdleWatch() {
 
 watch(screensaver, v => { v ? startSSClock() : stopSSClock() })
 
+watch(displayPrice, () => {
+  if (!purchasesLocked.value && purchases.value.length) {
+    displayInvested.value = totalInvested.value
+    displayCurrent.value = totalCurrent.value
+    displayGL.value = totalGL.value
+  }
+})
+
+
 // screensaver clock
 let ssClockTimer = null
 function startSSClock() {
