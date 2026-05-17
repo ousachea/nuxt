@@ -12,11 +12,25 @@ export const DEFAULT_ARTISTS = [
     mainWorks: ['___',]
   },
   {
+    name: '___',
+    cover: '',
+    url: '',  // Custom cover
+    compilations: [''],
+    mainWorks: ['___',]
+  },
+  {
+    name: 'Honoka Ashina 芦名ほのか',
+    cover: '',
+    url: '',  // Custom cover
+    compilations: [''],
+    mainWorks: ['CEMD-717','PMFT-338','YMDS-247','IESM-079','IENF-419','VEC-706','GVH-745','PXVR-273']
+  },
+  {
     name: 'Nao Satsuki 彩月七緒',
     cover: '',
     url: '',  // Custom cover
     compilations: [''],
-    mainWorks: ['HMN-849','JUFE-622','JUR-753','START-404']
+    mainWorks: ['HMN-849','JUFE-622','JUR-753','START-404','DASS-977','CAWD-987','MNGS-051','JUFE-618','JUFE-622']
   },
   {
     name: 'Unpai うんぱい',
@@ -152,11 +166,11 @@ export const DEFAULT_ARTISTS = [
     mainWorks: ['FNS-150', 'FSDSS-906', 'FSDSS-959', 'FNS-014']
   },
   {
-    name: 'Ran Kikuno',
+    name: 'Ran Kikuno 菊乃らん',
     cover: '',
     url: '',  // Custom cover
     compilations: [''],
-    mainWorks: ['FPRE-189', 'FPRE-101', 'FPRE-168', 'FPRE-036']
+    mainWorks: ['FPRE-189', 'FPRE-101', 'FPRE-168', 'FPRE-036','JUFE-516']
   },
   {
     name: 'Nanami Tina',
@@ -318,7 +332,7 @@ export const DEFAULT_ARTISTS = [
   {
     name: 'Collection', cover: '',
     url: '',  // Custom cover
-    compilations: [''], mainWorks: ['326FCT-197', '812MMC-025','300MIUM-546', '300MIUM-574', '300MIUM-609', '300MIUM-1222', '300MIUM-1210', '300MIUM-1211', '300MIUM-1317', '300MIUM-1202', '300MIUM-786', '300MIUM-1219', '300MIUM-810', '300MIUM-1001', '300MIUM-1141', '300MIUM-801', '300MIUM-778', '300MIUM-783', '300MIUM-811', '300MIUM-908', '300MIUM-886', 'SSIS-658', 'JUFD-948', 'MMKZ-162', 'HTHD-229', 'SGK-117', 'EVA-178', 'GANA-3003', 'SIRO-5232', 'ORECO-907', 'MAAN-1022', 'NTK-825', 'DANDY-923', 'EBOD-911', 'sone-306', 'DOCD-008', '300MAAN-546', '300MIUM-527', 'ADN-630', 'ARA-412', 'CLUB-855', 'DDHP-044', 'FC2-PPV-2864495', 'GANA-2858', 'JUFE-028', 'JUL-872', 'KTB-018', 'MIUM-681', 'MIUM-742', 'MIUM-811', 'NTK-391', 'ORECS-132', 'SSNI-362', 'SUKE-043', 'SUKE-053', 'TOUKA-01',]
+    compilations: [''], mainWorks: ['326FCT-197','CEMD-834','START-315', '812MMC-025','300MIUM-546', '300MIUM-574', '300MIUM-609', '300MIUM-1222', '300MIUM-1210', '300MIUM-1211', '300MIUM-1317', '300MIUM-1202', '300MIUM-786', '300MIUM-1219', '300MIUM-810', '300MIUM-1001', '300MIUM-1141', '300MIUM-801', '300MIUM-778', '300MIUM-783', '300MIUM-811', '300MIUM-908', '300MIUM-886', 'SSIS-658', 'JUFD-948', 'MMKZ-162', 'HTHD-229', 'SGK-117', 'EVA-178', 'GANA-3003', 'SIRO-5232', 'ORECO-907', 'MAAN-1022', 'NTK-825', 'DANDY-923', 'EBOD-911', 'sone-306', 'DOCD-008', '300MAAN-546', '300MIUM-527', 'ADN-630', 'ARA-412', 'CLUB-855', 'DDHP-044', 'FC2-PPV-2864495', 'GANA-2858', 'JUFE-028', 'JUL-872', 'KTB-018', 'MIUM-681', 'MIUM-742', 'MIUM-811', 'NTK-391', 'ORECS-132', 'SSNI-362', 'SUKE-043', 'SUKE-053', 'TOUKA-01',]
   },
   {
     name: 'Ema Yuina', cover: '',
